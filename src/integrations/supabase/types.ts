@@ -14,7 +14,124 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      digest_points: {
+        Row: {
+          detail: string
+          digest_id: string
+          heading: string
+          id: string
+          sort_order: number
+        }
+        Insert: {
+          detail: string
+          digest_id: string
+          heading: string
+          id?: string
+          sort_order?: number
+        }
+        Update: {
+          detail?: string
+          digest_id?: string
+          heading?: string
+          id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "digest_points_digest_id_fkey"
+            columns: ["digest_id"]
+            isOneToOne: false
+            referencedRelation: "digests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      digests: {
+        Row: {
+          author: string | null
+          created_at: string
+          date: string
+          feed_id: string | null
+          guest: string | null
+          guest_bio: string | null
+          id: string
+          quote: string | null
+          source: string
+          title: string
+          type: string
+          url: string
+          user_id: string
+        }
+        Insert: {
+          author?: string | null
+          created_at?: string
+          date: string
+          feed_id?: string | null
+          guest?: string | null
+          guest_bio?: string | null
+          id?: string
+          quote?: string | null
+          source: string
+          title: string
+          type?: string
+          url: string
+          user_id: string
+        }
+        Update: {
+          author?: string | null
+          created_at?: string
+          date?: string
+          feed_id?: string | null
+          guest?: string | null
+          guest_bio?: string | null
+          id?: string
+          quote?: string | null
+          source?: string
+          title?: string
+          type?: string
+          url?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "digests_feed_id_fkey"
+            columns: ["feed_id"]
+            isOneToOne: false
+            referencedRelation: "feeds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feeds: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name: string
+          type: string
+          url: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name: string
+          type?: string
+          url: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          type?: string
+          url?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
