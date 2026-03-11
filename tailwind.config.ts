@@ -53,6 +53,7 @@ export default {
         },
         podcast: "hsl(var(--podcast))",
         newsletter: "hsl(var(--newsletter))",
+        news: "hsl(var(--news))",
         success: "hsl(var(--success))",
         "surface-elevated": "hsl(var(--surface-elevated))",
         sidebar: {

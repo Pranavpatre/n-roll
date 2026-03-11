@@ -1,21 +1,22 @@
-import { Activity, Mic, FileText, Calendar, RefreshCw } from "lucide-react";
+import { Activity, Mic, FileText, Newspaper, Calendar, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface StatsBarProps {
+  totalDigests: number;
+  newsCount: number;
   podcastCount: number;
   newsletterCount: number;
-  digestsToday: number;
   lastRun?: string;
   onRefresh?: () => void;
   isRefreshing?: boolean;
 }
 
-const StatsBar = ({ podcastCount, newsletterCount, digestsToday, lastRun, onRefresh, isRefreshing }: StatsBarProps) => {
+const StatsBar = ({ totalDigests, newsCount, podcastCount, newsletterCount, lastRun, onRefresh, isRefreshing }: StatsBarProps) => {
   const stats = [
-    { label: "Podcast Feeds", value: podcastCount, icon: <Mic className="h-4 w-4 text-podcast" /> },
-    { label: "Newsletter Feeds", value: newsletterCount, icon: <FileText className="h-4 w-4 text-newsletter" /> },
-    { label: "Digests Today", value: digestsToday, icon: <Activity className="h-4 w-4 text-success" /> },
-    { label: "Last Run", value: lastRun || "—", icon: <Calendar className="h-4 w-4 text-muted-foreground" /> },
+    { label: "Total Digests", value: totalDigests, icon: <Activity className="h-4 w-4 text-success" /> },
+    { label: "News", value: newsCount, icon: <Newspaper className="h-4 w-4 text-news" /> },
+    { label: "Podcasts", value: podcastCount, icon: <Mic className="h-4 w-4 text-podcast" /> },
+    { label: "Newsletters", value: newsletterCount, icon: <FileText className="h-4 w-4 text-newsletter" /> },
   ];
 
   return (
@@ -31,10 +32,7 @@ const StatsBar = ({ podcastCount, newsletterCount, digestsToday, lastRun, onRefr
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {stats.map((s) => (
-          <div
-            key={s.label}
-            className="rounded-lg border border-border bg-surface-elevated p-4 shadow-card"
-          >
+          <div key={s.label} className="rounded-lg border border-border bg-surface-elevated p-4 shadow-card">
             <div className="flex items-center gap-2 mb-1">
               {s.icon}
               <span className="text-xs text-muted-foreground">{s.label}</span>

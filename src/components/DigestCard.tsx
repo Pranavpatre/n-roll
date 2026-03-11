@@ -1,7 +1,7 @@
-import { Mic, FileText, Clock, ExternalLink } from "lucide-react";
+import { Mic, FileText, Newspaper, Clock, ExternalLink } from "lucide-react";
 
 interface DigestCardProps {
-  type: "podcast" | "newsletter";
+  type: "podcast" | "newsletter" | "news";
   title: string;
   source: string;
   guest?: string;
@@ -12,6 +12,12 @@ interface DigestCardProps {
   points: { heading: string; detail: string }[];
   quote?: string;
 }
+
+const typeMeta = {
+  podcast: { icon: Mic, className: "bg-podcast/10 text-podcast" },
+  newsletter: { icon: FileText, className: "bg-newsletter/10 text-newsletter" },
+  news: { icon: Newspaper, className: "bg-news/10 text-news" },
+};
 
 const DigestCard = ({
   type,
@@ -25,7 +31,8 @@ const DigestCard = ({
   points,
   quote,
 }: DigestCardProps) => {
-  const isPodcast = type === "podcast";
+  const meta = typeMeta[type];
+  const Icon = meta.icon;
 
   return (
     <article
@@ -35,14 +42,8 @@ const DigestCard = ({
       {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-2">
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
-              isPodcast
-                ? "bg-podcast/10 text-podcast"
-                : "bg-newsletter/10 text-newsletter"
-            }`}
-          >
-            {isPodcast ? <Mic className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${meta.className}`}>
+            <Icon className="h-3 w-3" />
             {source}
           </span>
           <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -50,20 +51,13 @@ const DigestCard = ({
             {date}
           </span>
         </div>
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-muted-foreground hover:text-primary transition-colors"
-        >
+        <a href={url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors">
           <ExternalLink className="h-4 w-4" />
         </a>
       </div>
 
       {/* Title */}
-      <h3 className="font-display text-xl mb-1 text-foreground leading-snug">
-        "{title}"
-      </h3>
+      <h3 className="font-display text-xl mb-1 text-foreground leading-snug">"{title}"</h3>
 
       {/* Guest / Author */}
       {guest && (
@@ -94,13 +88,6 @@ const DigestCard = ({
           "{quote}"
         </blockquote>
       )}
-
-      {/* Footer */}
-      <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
-        <span className="inline-flex items-center gap-1 rounded bg-muted px-2 py-0.5">
-          📎 {isPodcast ? "Transcript" : "Article"} PDF
-        </span>
-      </div>
     </article>
   );
 };
