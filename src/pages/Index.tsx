@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { Zap, LogOut } from "lucide-react";
+import { Zap, LogOut, Shield } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import DigestCard from "@/components/DigestCard";
 import StatsBar from "@/components/StatsBar";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useAdmin } from "@/hooks/useAdmin";
 import { supabase } from "@/integrations/supabase/client";
 
 interface DigestItem {
