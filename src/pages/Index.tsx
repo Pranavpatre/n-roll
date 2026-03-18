@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { Zap, LogOut } from "lucide-react";
+import { Zap, LogOut, Shield } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import DigestCard from "@/components/DigestCard";
 import StatsBar from "@/components/StatsBar";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useAdmin } from "@/hooks/useAdmin";
 import { supabase } from "@/integrations/supabase/client";
 
 interface DigestItem {
@@ -27,6 +29,8 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { user, signOut } = useAuth();
+  const { isAdmin } = useAdmin();
+  const navigate = useNavigate();
 
   const fetchDigests = useCallback(async () => {
     if (!user) return;
@@ -140,6 +144,11 @@ const Index = () => {
             <span className="text-xs text-muted-foreground hidden sm:inline">
               {user?.email}
             </span>
+            {isAdmin && (
+              <Button variant="outline" size="sm" onClick={() => navigate("/admin")} className="gap-1.5">
+                <Shield className="h-3.5 w-3.5" /> Admin
+              </Button>
+            )}
             <Button variant="ghost" size="icon" onClick={signOut} title="Sign out">
               <LogOut className="h-4 w-4" />
             </Button>
