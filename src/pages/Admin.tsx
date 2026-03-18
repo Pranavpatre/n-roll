@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Shield, Plus, Trash2, RefreshCw, Rss, ArrowLeft, Newspaper, Mic, FileText, Youtube } from "lucide-react";
+import { Shield, Plus, Trash2, RefreshCw, ArrowLeft, Newspaper, Mic, FileText, Youtube, Twitter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -38,23 +38,44 @@ const typeOptions = [
   { value: "newsletter", label: "Newsletter", icon: FileText, color: "text-newsletter" },
 ] as const;
 
+const getInputConfig = (type: string) => {
+  switch (type) {
+    case "news":
+      return {
+        placeholder: "YouTube channel URL or X/Twitter handle (e.g. @elikisd)",
+        hint: "Paste a YouTube channel link or an X/Twitter handle",
+        icons: [Youtube, Twitter],
+      };
+    case "podcast":
+      return {
+        placeholder: "YouTube channel URL (e.g. youtube.com/@AllInPodcast)",
+        hint: "Paste a YouTube channel link",
+        icons: [Youtube],
+      };
+    case "newsletter":
+      return {
+        placeholder: "Newsletter RSS feed URL",
+        hint: "Paste the RSS feed URL directly",
+        icons: [FileText],
+      };
+    default:
+      return { placeholder: "URL", hint: "", icons: [] };
+  }
+};
+
 const Admin = () => {
   const { user } = useAdmin();
   const { toast } = useToast();
 
-  // Feed state
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [feedName, setFeedName] = useState("");
   const [feedUrl, setFeedUrl] = useState("");
   const [feedType, setFeedType] = useState<string>("news");
   const [feedLoading, setFeedLoading] = useState(true);
-
-  // Digest state
   const [digests, setDigests] = useState<Digest[]>([]);
   const [digestLoading, setDigestLoading] = useState(true);
-
-  // Refresh state
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [addingFeed, setAddingFeed] = useState(false);
 
   const fetchFeeds = useCallback(async () => {
     if (!user) return;
@@ -84,7 +105,14 @@ const Admin = () => {
     fetchDigests();
   }, [fetchFeeds, fetchDigests]);
 
-  const [addingFeed, setAddingFeed] = useState(false);
+  const isXHandle = (input: string) => {
+    const trimmed = input.trim();
+    return trimmed.startsWith("@") || trimmed.includes("twitter.com/") || trimmed.includes("x.com/");
+  };
+
+  const isYouTubeUrl = (input: string) => {
+    return input.includes("youtube.com") || input.includes("youtu.be");
+  };
 
   const handleAddFeed = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,20 +120,38 @@ const Admin = () => {
     setAddingFeed(true);
 
     try {
-      // Convert YouTube URL to RSS feed URL via edge function
-      const { data: rssData, error: rssError } = await supabase.functions.invoke("youtube-to-rss", {
-        body: { youtubeUrl: feedUrl.trim() },
-      });
+      let finalUrl = feedUrl.trim();
+      let sourceType = "rss"; // default for newsletters
 
-      if (rssError || rssData?.error) {
-        toast({ title: "Error", description: rssData?.error || rssError?.message || "Failed to convert YouTube URL", variant: "destructive" });
-        setAddingFeed(false);
-        return;
+      if (feedType === "newsletter") {
+        // Direct RSS — use as-is
+        sourceType = "rss";
+      } else if (isXHandle(finalUrl)) {
+        // X/Twitter handle — store as x:handle format
+        let handle = finalUrl;
+        if (handle.includes("twitter.com/") || handle.includes("x.com/")) {
+          handle = "@" + handle.split("/").pop()?.replace("@", "");
+        }
+        if (!handle.startsWith("@")) handle = "@" + handle;
+        finalUrl = `x:${handle}`;
+        sourceType = "x";
+      } else if (isYouTubeUrl(finalUrl)) {
+        // YouTube — convert to RSS
+        const { data: rssData, error: rssError } = await supabase.functions.invoke("youtube-to-rss", {
+          body: { youtubeUrl: finalUrl },
+        });
+        if (rssError || rssData?.error) {
+          toast({ title: "Error", description: rssData?.error || rssError?.message || "Failed to convert YouTube URL", variant: "destructive" });
+          setAddingFeed(false);
+          return;
+        }
+        finalUrl = rssData.rssUrl;
+        sourceType = "youtube";
       }
 
       const { error } = await supabase.from("feeds").insert({
         name: feedName.trim(),
-        url: rssData.rssUrl,
+        url: finalUrl,
         type: feedType,
         user_id: user.id,
       });
@@ -116,7 +162,7 @@ const Admin = () => {
         return;
       }
 
-      toast({ title: "Feed added", description: "YouTube channel RSS feed created successfully." });
+      toast({ title: "Feed added", description: `${feedName} added as ${feedType}.` });
       setFeedName("");
       setFeedUrl("");
       fetchFeeds();
@@ -177,6 +223,8 @@ const Admin = () => {
     return <Icon className={`h-4 w-4 ${opt.color}`} />;
   };
 
+  const inputConfig = getInputConfig(feedType);
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-surface-elevated">
@@ -205,7 +253,7 @@ const Admin = () => {
         {/* Add Feed */}
         <section className="space-y-4">
           <h2 className="font-display text-lg text-foreground">Add Feed</h2>
-          <form onSubmit={handleAddFeed} className="flex flex-wrap items-end gap-3">
+          <form onSubmit={handleAddFeed} className="space-y-3">
             <div className="flex gap-1.5">
               {typeOptions.map((t) => (
                 <button
@@ -222,24 +270,33 @@ const Admin = () => {
                 </button>
               ))}
             </div>
-            <Input
-              placeholder="Feed name"
-              value={feedName}
-              onChange={(e) => setFeedName(e.target.value)}
-              className="w-48"
-              required
-            />
-            <Input
-              placeholder="YouTube channel or video URL"
-              value={feedUrl}
-              onChange={(e) => setFeedUrl(e.target.value)}
-              className="flex-1 min-w-[200px]"
-              required
-            />
-            <Button type="submit" size="sm" className="gap-1.5" disabled={addingFeed}>
-              {addingFeed ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              {addingFeed ? "Adding…" : "Add"}
-            </Button>
+            <div className="flex flex-wrap items-end gap-3">
+              <Input
+                placeholder="Feed name"
+                value={feedName}
+                onChange={(e) => setFeedName(e.target.value)}
+                className="w-48"
+                required
+              />
+              <div className="flex-1 min-w-[200px] space-y-1">
+                <Input
+                  placeholder={inputConfig.placeholder}
+                  value={feedUrl}
+                  onChange={(e) => setFeedUrl(e.target.value)}
+                  required
+                />
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  {inputConfig.icons.map((Ic, i) => (
+                    <Ic key={i} className="h-3 w-3" />
+                  ))}
+                  {inputConfig.hint}
+                </p>
+              </div>
+              <Button type="submit" size="sm" className="gap-1.5" disabled={addingFeed}>
+                {addingFeed ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                {addingFeed ? "Adding…" : "Add"}
+              </Button>
+            </div>
           </form>
         </section>
 
