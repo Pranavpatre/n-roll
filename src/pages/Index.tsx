@@ -29,6 +29,8 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { user, signOut } = useAuth();
+  const { isAdmin } = useAdmin();
+  const navigate = useNavigate();
 
   const fetchDigests = useCallback(async () => {
     if (!user) return;
