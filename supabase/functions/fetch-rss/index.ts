@@ -6,9 +6,41 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// AI-related keywords for content filtering
+const AI_KEYWORDS = [
+  // Core AI terms
+  "artificial intelligence", "machine learning", "deep learning", "neural network",
+  "large language model", "llm", "generative ai", "gen ai", "genai",
+  // Models & products
+  "gpt", "chatgpt", "openai", "claude", "anthropic", "gemini", "mistral", "llama",
+  "midjourney", "stable diffusion", "dall-e", "dalle", "sora", "copilot",
+  "perplexity", "cursor", "devin", "lovable",
+  // Techniques & concepts
+  "transformer", "diffusion model", "fine-tuning", "fine tuning", "finetuning",
+  "prompt engineering", "rag ", "retrieval augmented", "vector database",
+  "embedding", "tokenizer", "inference", "training data",
+  "reinforcement learning", "rlhf", "chain of thought", "cot",
+  "multimodal", "multi-modal", "vision model", "text-to-image", "text-to-video",
+  "text-to-speech", "speech-to-text", "text to image", "text to video",
+  // AI agents & automation
+  "ai agent", "ai agents", "agentic", "autonomous agent", "ai assistant",
+  "ai tool", "ai tools", "ai app", "ai startup", "ai company",
+  "ai safety", "ai alignment", "ai ethics", "ai regulation", "ai policy",
+  "ai chip", "ai hardware", "gpu", "nvidia", "tpu",
+  // Industry terms
+  "foundation model", "frontier model", "open source ai", "open-source ai",
+  "ai research", "ai paper", "ai benchmark", "ai model",
+  "natural language processing", "nlp", "computer vision",
+  "robotics", "humanoid", "autonomous driving", "self-driving",
+];
+
+function isAIRelated(title: string, description: string): boolean {
+  const text = `${title} ${description}`.toLowerCase();
+  return AI_KEYWORDS.some((kw) => text.includes(kw));
+}
+
 function extractItems(xml: string) {
   const items: { title: string; link: string; description: string; pubDate: string }[] = [];
-  // Support both <item> (RSS) and <entry> (Atom/YouTube)
   const itemRegex = /<(?:item|entry)[\s>]([\s\S]*?)<\/(?:item|entry)>/gi;
   let match;
   while ((match = itemRegex.exec(xml)) !== null) {
@@ -66,7 +98,7 @@ serve(async (req) => {
       .eq("user_id", userId);
     const existingUrls = new Set((existingDigests || []).map((d: any) => d.url));
 
-    const cutoff = new Date(Date.now() - 28 * 60 * 60 * 1000); // 28 hours ago
+    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
     const allItems: any[] = [];
 
     for (const feed of feeds) {
@@ -79,24 +111,36 @@ serve(async (req) => {
         const xml = await res.text();
         const items = extractItems(xml);
 
-        for (const item of items.slice(0, 5)) { // max 5 per feed
+        let added = 0;
+        for (const item of items) {
+          if (added >= 5) break; // max 5 per feed
           if (existingUrls.has(item.link)) continue;
           const pubDate = item.pubDate ? new Date(item.pubDate) : new Date();
           if (pubDate < cutoff) continue;
+
+          // Filter: only AI-related content
+          if (!isAIRelated(item.title, item.description)) {
+            console.log(`Skipped (not AI-related): ${item.title}`);
+            continue;
+          }
+
           allItems.push({
             feedId: feed.id,
             feedName: feed.name,
-            feedType: feed.type === "newsletter" ? "newsletter" : "podcast",
+            feedType: feed.type, // use actual feed type from DB
             title: item.title,
             link: item.link,
             description: item.description.slice(0, 2000),
             pubDate: pubDate.toISOString(),
           });
+          added++;
         }
       } catch (e) {
         console.error(`Error fetching ${feed.url}:`, e);
       }
     }
+
+    console.log(`Total AI-related items found: ${allItems.length}`);
 
     return new Response(JSON.stringify({ items: allItems }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
