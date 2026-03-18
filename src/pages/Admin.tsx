@@ -230,28 +230,17 @@ const Admin = () => {
               required
             />
             <Input
-              placeholder="RSS URL"
+              placeholder="YouTube channel or video URL"
               value={feedUrl}
               onChange={(e) => setFeedUrl(e.target.value)}
               className="flex-1 min-w-[200px]"
               required
             />
-            <Button type="submit" size="sm" className="gap-1.5">
-              <Plus className="h-4 w-4" /> Add
+            <Button type="submit" size="sm" className="gap-1.5" disabled={addingFeed}>
+              {addingFeed ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              {addingFeed ? "Adding…" : "Add"}
             </Button>
           </form>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Youtube className="h-3.5 w-3.5" />
-            <span>Need a YouTube RSS feed?</span>
-            <a
-              href="https://rss.app/rss-feed/create-youtube-rss-feed"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-primary hover:underline font-medium"
-            >
-              Create one here <ExternalLink className="h-3 w-3" />
-            </a>
-          </div>
         </section>
 
         {/* Feeds Table */}
