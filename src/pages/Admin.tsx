@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Shield, Plus, Trash2, RefreshCw, Rss, ArrowLeft, Newspaper, Mic, FileText, ExternalLink, Youtube } from "lucide-react";
+import { Shield, Plus, Trash2, RefreshCw, Rss, ArrowLeft, Newspaper, Mic, FileText, Youtube } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
