@@ -68,7 +68,6 @@ const Admin = () => {
   const { toast } = useToast();
 
   const [feeds, setFeeds] = useState<Feed[]>([]);
-  const [feedName, setFeedName] = useState("");
   const [feedUrl, setFeedUrl] = useState("");
   const [feedType, setFeedType] = useState<string>("news");
   const [feedLoading, setFeedLoading] = useState(true);
@@ -114,20 +113,50 @@ const Admin = () => {
     return input.includes("youtube.com") || input.includes("youtu.be");
   };
 
+  const deriveNameFromUrl = (url: string, type: string): string => {
+    const trimmed = url.trim();
+    if (isXHandle(trimmed)) {
+      let handle = trimmed;
+      if (handle.includes("twitter.com/") || handle.includes("x.com/")) {
+        handle = handle.split("/").pop()?.replace("@", "") || handle;
+      }
+      handle = handle.replace("@", "");
+      return `@${handle}`;
+    }
+    if (isYouTubeUrl(trimmed)) {
+      try {
+        const urlObj = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
+        const path = urlObj.pathname;
+        if (path.startsWith("/@")) return path.slice(1);
+        if (path.includes("/channel/")) return path.split("/channel/")[1]?.split("/")[0] || "YouTube Channel";
+        if (path.includes("/c/")) return path.split("/c/")[1]?.split("/")[0] || "YouTube Channel";
+        return path.split("/").filter(Boolean).pop() || "YouTube Channel";
+      } catch {
+        return "YouTube Channel";
+      }
+    }
+    // RSS — extract domain
+    try {
+      const urlObj = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
+      return urlObj.hostname.replace("www.", "");
+    } catch {
+      return trimmed.slice(0, 40);
+    }
+  };
+
   const handleAddFeed = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!feedName.trim() || !feedUrl.trim() || !user) return;
+    if (!feedUrl.trim() || !user) return;
     setAddingFeed(true);
 
     try {
       let finalUrl = feedUrl.trim();
-      let sourceType = "rss"; // default for newsletters
+      let sourceType = "rss";
+      const feedName = deriveNameFromUrl(feedUrl, feedType);
 
       if (feedType === "newsletter") {
-        // Direct RSS — use as-is
         sourceType = "rss";
       } else if (isXHandle(finalUrl)) {
-        // X/Twitter handle — store as x:handle format
         let handle = finalUrl;
         if (handle.includes("twitter.com/") || handle.includes("x.com/")) {
           handle = "@" + handle.split("/").pop()?.replace("@", "");
@@ -136,7 +165,6 @@ const Admin = () => {
         finalUrl = `x:${handle}`;
         sourceType = "x";
       } else if (isYouTubeUrl(finalUrl)) {
-        // YouTube — convert to RSS
         const { data: rssData, error: rssError } = await supabase.functions.invoke("youtube-to-rss", {
           body: { youtubeUrl: finalUrl },
         });
@@ -150,7 +178,7 @@ const Admin = () => {
       }
 
       const { error } = await supabase.from("feeds").insert({
-        name: feedName.trim(),
+        name: feedName,
         url: finalUrl,
         type: feedType,
         user_id: user.id,
@@ -163,7 +191,6 @@ const Admin = () => {
       }
 
       toast({ title: "Feed added", description: `${feedName} added as ${feedType}.` });
-      setFeedName("");
       setFeedUrl("");
       fetchFeeds();
     } catch (err: any) {
@@ -271,13 +298,6 @@ const Admin = () => {
               ))}
             </div>
             <div className="flex flex-wrap items-end gap-3">
-              <Input
-                placeholder="Feed name"
-                value={feedName}
-                onChange={(e) => setFeedName(e.target.value)}
-                className="w-48"
-                required
-              />
               <div className="flex-1 min-w-[200px] space-y-1">
                 <Input
                   placeholder={inputConfig.placeholder}
