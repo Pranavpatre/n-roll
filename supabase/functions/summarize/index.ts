@@ -37,16 +37,22 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    const systemPrompt = `You are a digest summarizer for an AI news app. Given an article or post title and description, produce a structured summary. Return valid JSON with this schema:
-{
-  "topic": "A clear, concise 5-10 word topic line that captures the core news/announcement. Not a vague label — a specific statement like 'Anthropic launches Dispatch for automated AI workflows' or 'OpenAI releases GPT-5 with improved reasoning'.",
-  "points": [{"heading": "concise but descriptive heading (5-8 words)", "detail": "1-2 sentence explanation with specifics"}],
-  "quote": "optional memorable quote from the content",
-  "guest": "guest name if applicable",
-  "guestBio": "one-line guest bio if applicable",
-  "author": "author name if applicable"
-}
-Return 3-5 key points. Each heading must be a clear mini-statement, NOT a generic label like "Key Update" or "New Feature". Be specific — e.g. "Dispatch automates multi-step AI tasks" not "New product announced". Always return valid JSON only, no markdown.`;
+    const systemPrompt = `You summarize AI news into structured JSON. Rules:
+
+TOPIC (required): Write a factual headline of 5-12 words. Format: "[Company/Product] [verb] [what happened]".
+GOOD: "Anthropic launches Dispatch for automated AI workflows"
+GOOD: "OpenAI releases GPT-5 with improved reasoning capabilities"  
+GOOD: "Google DeepMind open-sources Gemma 3 model weights"
+BAD: "Crucially, Anthropic takes its stand in the matter" (too editorial)
+BAD: "A new chapter in AI development" (too vague)
+BAD: "Key Update" or "New Feature" (too generic)
+
+The topic MUST start with a proper noun (company/product name) and contain a concrete action verb (launches, releases, announces, introduces, open-sources, partners, raises, expands).
+
+POINTS: 3-5 key points. Each heading is a specific mini-fact (5-8 words), each detail is 1-2 sentences.
+
+Return ONLY valid JSON:
+{"topic":"...","points":[{"heading":"...","detail":"..."}],"quote":"optional","guest":"optional","guestBio":"optional","author":"optional"}`;
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -85,11 +91,22 @@ Return 3-5 key points. Each heading must be a clear mini-statement, NOT a generi
 
     let summary;
     try {
-      // Strip markdown code fences if present
       const cleaned = content.replace(/```json\n?|\n?```/g, "").trim();
       summary = JSON.parse(cleaned);
     } catch {
       summary = { points: [{ heading: "Summary", detail: content.slice(0, 500) }] };
+    }
+
+    // Validate topic: reject editorial/vague topics, fall back to original title
+    const topic = summary.topic || "";
+    const isBadTopic = !topic
+      || topic.length > 100
+      || topic.length < 10
+      || /^(crucially|notably|importantly|interestingly|a new|the latest|key update|new feature)/i.test(topic)
+      || !/[A-Z]/.test(topic.charAt(0));
+    if (isBadTopic) {
+      // Use original title, truncated and cleaned
+      summary.topic = item.title.replace(/^RT @\w+:\s*/, "").slice(0, 80);
     }
 
     // Save digest to DB
