@@ -206,12 +206,7 @@ serve(async (req) => {
 
     // Process Gmail newsletter feeds (requires providerToken from request body)
     if (gmailFeeds.length > 0) {
-      let providerToken: string | null = null;
-      try {
-        const body = await req.clone().json().catch(() => ({}));
-        providerToken = body?.providerToken || null;
-      } catch {}
-
+      const providerToken = requestBody?.providerToken || null;
       if (providerToken) {
         try {
           const gmailDomains = gmailFeeds.map((f: any) => ({
