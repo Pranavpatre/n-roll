@@ -91,11 +91,22 @@ Return ONLY valid JSON:
 
     let summary;
     try {
-      // Strip markdown code fences if present
       const cleaned = content.replace(/```json\n?|\n?```/g, "").trim();
       summary = JSON.parse(cleaned);
     } catch {
       summary = { points: [{ heading: "Summary", detail: content.slice(0, 500) }] };
+    }
+
+    // Validate topic: reject editorial/vague topics, fall back to original title
+    const topic = summary.topic || "";
+    const isBadTopic = !topic
+      || topic.length > 100
+      || topic.length < 10
+      || /^(crucially|notably|importantly|interestingly|a new|the latest|key update|new feature)/i.test(topic)
+      || !/[A-Z]/.test(topic.charAt(0));
+    if (isBadTopic) {
+      // Use original title, truncated and cleaned
+      summary.topic = item.title.replace(/^RT @\w+:\s*/, "").slice(0, 80);
     }
 
     // Save digest to DB
