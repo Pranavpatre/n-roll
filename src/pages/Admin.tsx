@@ -442,19 +442,19 @@ const Admin = () => {
                       </TableCell>
                       <TableCell>
                         {nl.rss ? (
-                          <span className="text-xs text-green-500">Available</span>
+                          <span className="text-xs text-green-500">RSS</span>
                         ) : (
-                          <span className="text-xs text-muted-foreground">Not found</span>
+                          <span className="text-xs text-amber-500">Gmail</span>
                         )}
                       </TableCell>
                       <TableCell>
-                        {nl.rss && !addedGmailDomains.has(nl.domain) ? (
+                        {!addedGmailDomains.has(nl.domain) ? (
                           <Button size="sm" variant="ghost" onClick={() => handleAddGmailNewsletter(nl)} className="h-7 gap-1">
                             <Plus className="h-3 w-3" /> Add
                           </Button>
-                        ) : addedGmailDomains.has(nl.domain) ? (
+                        ) : (
                           <span className="text-xs text-green-500 flex items-center gap-1"><Check className="h-3 w-3" /> Added</span>
-                        ) : null}
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
