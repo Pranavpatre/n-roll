@@ -62,16 +62,27 @@ serve(async (req) => {
     const cleanHandle = handle.replace(/^@/, "");
     console.log(`Searching for X posts from @${cleanHandle} via Firecrawl Search API`);
 
-    // Primary search: recent posts from/about this handle
-    const query = `"@${cleanHandle}" OR "${cleanHandle}" site:x.com OR site:twitter.com`;
+    // Primary search: direct profile posts
+    const query = `from:${cleanHandle} site:x.com`;
     
     let items = await searchFirecrawl(apiKey, query, cleanHandle);
 
-    // Fallback: broader search if no results
-    if (items.length === 0) {
-      console.log(`No results from primary search, trying broader query for @${cleanHandle}`);
-      const fallbackQuery = `${cleanHandle} AI announcement OR launch OR release`;
-      items = await searchFirecrawl(apiKey, fallbackQuery, cleanHandle);
+    // Second attempt: mentions and news about the handle
+    if (items.length < 3) {
+      console.log(`Few results from primary search, trying mentions query for @${cleanHandle}`);
+      const mentionsQuery = `"@${cleanHandle}" OR "${cleanHandle}" site:x.com`;
+      const moreItems = await searchFirecrawl(apiKey, mentionsQuery, cleanHandle);
+      const existingLinks = new Set(items.map(i => i.link));
+      items.push(...moreItems.filter(i => !existingLinks.has(i.link)));
+    }
+
+    // Third attempt: broader web search for product launches
+    if (items.length < 3) {
+      console.log(`Still few results, trying broader product launch query for @${cleanHandle}`);
+      const launchQuery = `${cleanHandle} launch OR release OR announce OR introducing 2026`;
+      const launchItems = await searchFirecrawl(apiKey, launchQuery, cleanHandle);
+      const existingLinks = new Set(items.map(i => i.link));
+      items.push(...launchItems.filter(i => !existingLinks.has(i.link)));
     }
 
     console.log(`Found ${items.length} AI-related items from @${cleanHandle}`);

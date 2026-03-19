@@ -37,15 +37,16 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    const systemPrompt = `You are a digest summarizer. Given an article or podcast episode title and description, produce a structured summary. Return valid JSON with this schema:
+    const systemPrompt = `You are a digest summarizer for an AI news app. Given an article or post title and description, produce a structured summary. Return valid JSON with this schema:
 {
-  "points": [{"heading": "short label", "detail": "1-2 sentence explanation"}],
+  "topic": "A clear, concise 5-10 word topic line that captures the core news/announcement. Not a vague label — a specific statement like 'Anthropic launches Dispatch for automated AI workflows' or 'OpenAI releases GPT-5 with improved reasoning'.",
+  "points": [{"heading": "concise but descriptive heading (5-8 words)", "detail": "1-2 sentence explanation with specifics"}],
   "quote": "optional memorable quote from the content",
   "guest": "guest name if applicable",
   "guestBio": "one-line guest bio if applicable",
   "author": "author name if applicable"
 }
-Return 3-6 key points. Be concise, insightful, and specific. If there's no guest/author info, omit those fields. Always return valid JSON only, no markdown.`;
+Return 3-5 key points. Each heading must be a clear mini-statement, NOT a generic label like "Key Update" or "New Feature". Be specific — e.g. "Dispatch automates multi-step AI tasks" not "New product announced". Always return valid JSON only, no markdown.`;
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -100,7 +101,7 @@ Return 3-6 key points. Be concise, insightful, and specific. If there's no guest
       .insert({
         user_id: userId,
         feed_id: item.feedId,
-        title: item.title,
+        title: summary.topic || item.title,
         source: item.feedName,
         guest: summary.guest || null,
         guest_bio: summary.guestBio || null,
