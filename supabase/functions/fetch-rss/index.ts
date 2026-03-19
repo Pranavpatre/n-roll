@@ -74,6 +74,10 @@ function extractItems(xml: string) {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  // Parse body early for providerToken
+  let requestBody: any = {};
+  try { requestBody = await req.json(); } catch {}
+
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
