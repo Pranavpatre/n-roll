@@ -33,9 +33,24 @@ const AI_KEYWORDS = [
   "cohere", "databricks", "snowflake cortex", "groq",
 ];
 
+const ACTION_KEYWORDS = [
+  "launching", "launched", "announcing", "announced", "introducing", "introduced",
+  "now available", "rolling out", "just shipped", "new release",
+  "beta", "early access", "waitlist", "api access", "open source",
+];
+
+const AI_CONTEXT_WORDS = [
+  "ai", "artificial intelligence", "machine learning", "ml", "llm", "model",
+  "gpt", "claude", "gemini", "neural", "deep learning", "generative",
+  "agent", "copilot", "chatbot", "diffusion",
+];
+
 function isAIRelated(text: string): boolean {
   const lower = text.toLowerCase();
-  return AI_KEYWORDS.some((kw) => lower.includes(kw));
+  if (AI_KEYWORDS.some((kw) => lower.includes(kw))) return true;
+  const hasAction = ACTION_KEYWORDS.some((kw) => lower.includes(kw));
+  const hasAIContext = AI_CONTEXT_WORDS.some((kw) => lower.includes(kw));
+  return hasAction && hasAIContext;
 }
 
 serve(async (req) => {
