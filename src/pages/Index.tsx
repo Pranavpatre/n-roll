@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Zap, LogOut, Shield, Filter } from "lucide-react";
+import { Zap, LogOut, Shield, Filter, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import DigestCard from "@/components/DigestCard";
 import { Button } from "@/components/ui/button";
