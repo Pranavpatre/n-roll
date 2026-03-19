@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { Shield, Plus, Trash2, RefreshCw, ArrowLeft, Newspaper, Mic, FileText, Youtube, Twitter } from "lucide-react";
+import { Shield, Plus, Trash2, RefreshCw, ArrowLeft, Newspaper, Mic, FileText, Youtube, Twitter, Mail, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAdmin } from "@/hooks/useAdmin";
 import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable/index";
 import { Link } from "react-router-dom";
 import {
   Table,
@@ -75,6 +76,9 @@ const Admin = () => {
   const [digestLoading, setDigestLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [addingFeed, setAddingFeed] = useState(false);
+  const [scanningGmail, setScanningGmail] = useState(false);
+  const [gmailResults, setGmailResults] = useState<{ name: string; domain: string; rss: string | null; sampleSubject: string }[]>([]);
+  const [addedGmailDomains, setAddedGmailDomains] = useState<Set<string>>(new Set());
 
   const fetchFeeds = useCallback(async () => {
     if (!user) return;
@@ -244,6 +248,74 @@ const Admin = () => {
     }
   };
 
+  const handleScanGmail = async () => {
+    setScanningGmail(true);
+    setGmailResults([]);
+    try {
+      // Sign in with Google to get Gmail access
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin,
+        extraParams: {
+          prompt: "consent",
+          access_type: "offline",
+          scope: "https://www.googleapis.com/auth/gmail.readonly",
+        },
+      });
+
+      if (result.error) {
+        toast({ title: "Google sign-in failed", description: String(result.error), variant: "destructive" });
+        setScanningGmail(false);
+        return;
+      }
+
+      // After redirect, we need the provider token
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      const providerToken = currentSession?.provider_token;
+
+      if (!providerToken) {
+        toast({ title: "No Gmail access", description: "Could not get Gmail access token. Please try again.", variant: "destructive" });
+        setScanningGmail(false);
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke("scan-gmail", {
+        body: { providerToken },
+      });
+
+      if (error) throw error;
+
+      const newsletters = data?.newsletters || [];
+      if (newsletters.length === 0) {
+        toast({ title: "No AI newsletters found", description: "We didn't find any AI-related newsletters in your Gmail." });
+      } else {
+        toast({ title: `Found ${newsletters.length} AI newsletters`, description: "Review and add them below." });
+      }
+      setGmailResults(newsletters);
+    } catch (e: any) {
+      toast({ title: "Gmail scan failed", description: e.message, variant: "destructive" });
+    } finally {
+      setScanningGmail(false);
+    }
+  };
+
+  const handleAddGmailNewsletter = async (newsletter: { name: string; domain: string; rss: string | null }) => {
+    if (!user || !newsletter.rss) return;
+    try {
+      const { error } = await supabase.from("feeds").insert({
+        name: newsletter.name,
+        url: newsletter.rss,
+        type: "newsletter",
+        user_id: user.id,
+      });
+      if (error) throw error;
+      setAddedGmailDomains((prev) => new Set(prev).add(newsletter.domain));
+      toast({ title: "Added", description: `${newsletter.name} added as a newsletter feed.` });
+      fetchFeeds();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    }
+  };
+
   const TypeIcon = ({ type }: { type: string }) => {
     const opt = typeOptions.find((t) => t.value === type) || typeOptions[0];
     const Icon = opt.icon;
@@ -318,6 +390,65 @@ const Admin = () => {
               </Button>
             </div>
           </form>
+        </section>
+
+        {/* Scan Gmail */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-lg text-foreground">Scan Gmail for Newsletters</h2>
+            <Button variant="outline" size="sm" onClick={handleScanGmail} disabled={scanningGmail} className="gap-1.5">
+              {scanningGmail ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
+              {scanningGmail ? "Scanning…" : "Scan Gmail"}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Connect your Google account to find AI newsletters you're subscribed to. We only read email headers (sender & subject) — never email content.
+          </p>
+          {gmailResults.length > 0 && (
+            <div className="rounded-lg border border-border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Newsletter</TableHead>
+                    <TableHead className="hidden sm:table-cell">Sample Subject</TableHead>
+                    <TableHead className="w-24">RSS</TableHead>
+                    <TableHead className="w-16"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {gmailResults.map((nl) => (
+                    <TableRow key={nl.domain}>
+                      <TableCell>
+                        <div>
+                          <span className="font-medium">{nl.name}</span>
+                          <span className="block text-xs text-muted-foreground">{nl.domain}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell text-muted-foreground text-xs truncate max-w-[300px]">
+                        {nl.sampleSubject}
+                      </TableCell>
+                      <TableCell>
+                        {nl.rss ? (
+                          <span className="text-xs text-green-500">Available</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Not found</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {nl.rss && !addedGmailDomains.has(nl.domain) ? (
+                          <Button size="sm" variant="ghost" onClick={() => handleAddGmailNewsletter(nl)} className="h-7 gap-1">
+                            <Plus className="h-3 w-3" /> Add
+                          </Button>
+                        ) : addedGmailDomains.has(nl.domain) ? (
+                          <span className="text-xs text-green-500 flex items-center gap-1"><Check className="h-3 w-3" /> Added</span>
+                        ) : null}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </section>
 
         {/* Feeds Table */}
