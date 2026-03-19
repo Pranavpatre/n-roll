@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.summarize]
 verify_jwt = false
+
+[functions.scan-gmail]
+verify_jwt = false
