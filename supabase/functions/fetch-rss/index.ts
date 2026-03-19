@@ -200,9 +200,54 @@ serve(async (req) => {
       }
     }
 
+    // Process Gmail newsletter feeds (requires providerToken from request body)
+    if (gmailFeeds.length > 0) {
+      let providerToken: string | null = null;
+      try {
+        const body = await req.clone().json().catch(() => ({}));
+        providerToken = body?.providerToken || null;
+      } catch {}
+
+      if (providerToken) {
+        try {
+          const gmailDomains = gmailFeeds.map((f: any) => ({
+            feedId: f.id,
+            feedName: f.name,
+            domain: f.url.replace("gmail:", ""),
+          }));
+
+          const gmailRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/fetch-gmail-content`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+            },
+            body: JSON.stringify({
+              providerToken,
+              domains: gmailDomains,
+              existingUrls: Array.from(existingUrls),
+            }),
+          });
+
+          if (gmailRes.ok) {
+            const gmailData = await gmailRes.json();
+            const gmailItems = gmailData?.items || [];
+            allItems.push(...gmailItems);
+            console.log(`Added ${gmailItems.length} items from Gmail newsletters`);
+          } else {
+            console.error(`fetch-gmail-content failed: ${gmailRes.status}`);
+          }
+        } catch (e) {
+          console.error("Error fetching Gmail content:", e);
+        }
+      } else {
+        console.log(`Skipping ${gmailFeeds.length} Gmail feeds — no provider token`);
+      }
+    }
+
     console.log(`Total AI-related items found: ${allItems.length}`);
 
-    return new Response(JSON.stringify({ items: allItems }), {
+    return new Response(JSON.stringify({ items: allItems, hasGmailFeeds: gmailFeeds.length > 0 }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
