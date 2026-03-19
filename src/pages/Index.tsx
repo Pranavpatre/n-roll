@@ -192,6 +192,12 @@ const Index = () => {
               <Filter className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
             </div>
 
+            {syncing && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground mr-1">
+                <RefreshCw className="h-3 w-3 animate-spin" />
+                <span className="hidden sm:inline">Syncing…</span>
+              </div>
+            )}
             {isAdmin && (
               <Button variant="ghost" size="icon" onClick={() => navigate("/admin")} title="Admin">
                 <Shield className="h-4 w-4" />
