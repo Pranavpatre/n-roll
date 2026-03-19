@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.scan-gmail]
 verify_jwt = false
+
+[functions.fetch-gmail-content]
+verify_jwt = false
