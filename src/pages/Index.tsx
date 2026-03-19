@@ -24,9 +24,12 @@ interface DigestItem {
 
 type FilterType = "all" | "news" | "podcast" | "newsletter";
 
+const REFRESH_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes
+
 const Index = () => {
   const [digests, setDigests] = useState<DigestItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [filter, setFilter] = useState<FilterType>("all");
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -84,9 +87,43 @@ const Index = () => {
     setLoading(false);
   }, [user]);
 
+  // Auto-sync: fetch new feed items + summarize on page load (with cooldown)
+  const autoSync = useCallback(async () => {
+    if (!user) return;
+    const cacheKey = `digest_last_sync_${user.id}`;
+    const lastSync = localStorage.getItem(cacheKey);
+    if (lastSync && Date.now() - Number(lastSync) < REFRESH_COOLDOWN_MS) return;
+
+    setSyncing(true);
+    try {
+      const { data: rssData, error: rssError } = await supabase.functions.invoke("fetch-rss");
+      if (rssError) throw rssError;
+
+      const items = rssData?.items || [];
+      if (items.length > 0) {
+        let successCount = 0;
+        for (const item of items) {
+          try {
+            const { error } = await supabase.functions.invoke("summarize", { body: { item } });
+            if (!error) successCount++;
+          } catch {}
+        }
+        if (successCount > 0) {
+          toast({ title: "New digests!", description: `${successCount} new summaries added.` });
+          await fetchDigests();
+        }
+      }
+      localStorage.setItem(cacheKey, String(Date.now()));
+    } catch (e) {
+      console.error("Auto-sync failed:", e);
+    } finally {
+      setSyncing(false);
+    }
+  }, [user, fetchDigests, toast]);
+
   useEffect(() => {
-    fetchDigests();
-  }, [fetchDigests]);
+    fetchDigests().then(() => autoSync());
+  }, [fetchDigests, autoSync]);
 
   const filtered = filter === "all" ? digests : digests.filter((d) => d.type === filter);
 
