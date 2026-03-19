@@ -68,7 +68,6 @@ const Admin = () => {
   const { toast } = useToast();
 
   const [feeds, setFeeds] = useState<Feed[]>([]);
-  const [feedName, setFeedName] = useState("");
   const [feedUrl, setFeedUrl] = useState("");
   const [feedType, setFeedType] = useState<string>("news");
   const [feedLoading, setFeedLoading] = useState(true);
