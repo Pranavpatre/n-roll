@@ -101,7 +101,7 @@ const DigestCard = ({
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
         >
-          Read full article <ExternalLink className="h-3.5 w-3.5" />
+          {type === "podcast" ? "Listen to episode" : type === "newsletter" ? "Read newsletter" : "Read full article"}{" "}<ExternalLink className="h-3.5 w-3.5" />
         </a>
         <div className="flex items-center gap-1 text-xs text-muted-foreground animate-bounce">
           <ChevronDown className="h-4 w-4" />
