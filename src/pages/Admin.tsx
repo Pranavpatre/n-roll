@@ -329,6 +329,31 @@ const Admin = () => {
     }
   };
 
+  const handleImportXFollowing = async () => {
+    if (!user) return;
+    setImportingX(true);
+    try {
+      toast({ title: "Importing X following list…", description: "Fetching accounts you follow on X." });
+      
+      const { data, error } = await supabase.functions.invoke("fetch-x-following", {
+        body: { username: "pranavpatre" },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast({
+        title: "X import complete!",
+        description: `Imported ${data.imported} new feeds, skipped ${data.skipped} duplicates (${data.total} total following).`,
+      });
+      fetchFeeds();
+    } catch (e: any) {
+      toast({ title: "Import failed", description: e.message, variant: "destructive" });
+    } finally {
+      setImportingX(false);
+    }
+  };
+
   const TypeIcon = ({ type }: { type: string }) => {
     const opt = typeOptions.find((t) => t.value === type) || typeOptions[0];
     const Icon = opt.icon;
