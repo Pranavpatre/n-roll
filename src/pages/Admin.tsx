@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Shield, Plus, Trash2, RefreshCw, ArrowLeft, Newspaper, Mic, FileText, Youtube, Twitter, Mail, Check } from "lucide-react";
+import { Shield, Plus, Trash2, RefreshCw, ArrowLeft, Newspaper, Mic, FileText, Youtube, Twitter, Mail, Check, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -79,7 +79,7 @@ const Admin = () => {
   const [scanningGmail, setScanningGmail] = useState(false);
   const [gmailResults, setGmailResults] = useState<{ name: string; domain: string; rss: string | null; sampleSubject: string }[]>([]);
   const [addedGmailDomains, setAddedGmailDomains] = useState<Set<string>>(new Set());
-
+  const [importingX, setImportingX] = useState(false);
   const fetchFeeds = useCallback(async () => {
     if (!user) return;
     const { data } = await supabase
@@ -329,6 +329,31 @@ const Admin = () => {
     }
   };
 
+  const handleImportXFollowing = async () => {
+    if (!user) return;
+    setImportingX(true);
+    try {
+      toast({ title: "Importing X following list…", description: "Fetching accounts you follow on X." });
+      
+      const { data, error } = await supabase.functions.invoke("fetch-x-following", {
+        body: { username: "pranavpatre" },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast({
+        title: "X import complete!",
+        description: `Imported ${data.imported} new feeds, skipped ${data.skipped} duplicates (${data.total} total following).`,
+      });
+      fetchFeeds();
+    } catch (e: any) {
+      toast({ title: "Import failed", description: e.message, variant: "destructive" });
+    } finally {
+      setImportingX(false);
+    }
+  };
+
   const TypeIcon = ({ type }: { type: string }) => {
     const opt = typeOptions.find((t) => t.value === type) || typeOptions[0];
     const Icon = opt.icon;
@@ -462,6 +487,20 @@ const Admin = () => {
               </Table>
             </div>
           )}
+        </section>
+
+        {/* Import X Following */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-lg text-foreground">Import X Following</h2>
+            <Button variant="outline" size="sm" onClick={handleImportXFollowing} disabled={importingX} className="gap-1.5">
+              {importingX ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+              {importingX ? "Importing…" : "Import from @pranavpatre"}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Fetch all accounts you follow on X and add them as news feeds. Duplicates will be skipped automatically.
+          </p>
         </section>
 
         {/* Feeds Table */}
