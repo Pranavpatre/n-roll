@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.fetch-gmail-content]
 verify_jwt = false
+
+[functions.fetch-x-following]
+verify_jwt = false
