@@ -329,28 +329,66 @@ const Admin = () => {
     }
   };
 
-  const handleImportXFollowing = async () => {
-    if (!user) return;
+  const xFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportXFollowing = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
     setImportingX(true);
     try {
-      toast({ title: "Importing X following list…", description: "Fetching accounts you follow on X." });
-      
-      const { data, error } = await supabase.functions.invoke("fetch-x-following", {
-        body: { username: "pranavpatre" },
-      });
+      const text = await file.text();
+      // following.js starts with "window.YTD.following.part0 = "
+      const jsonStr = text.replace(/^window\.YTD\.following\.part\d+\s*=\s*/, "");
+      const parsed = JSON.parse(jsonStr);
 
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      const handles: string[] = parsed
+        .map((entry: any) => {
+          const link = entry?.following?.userLink || "";
+          const match = link.match(/x\.com\/(.+)/);
+          return match ? match[1] : null;
+        })
+        .filter(Boolean);
 
+      if (handles.length === 0) {
+        toast({ title: "No accounts found", description: "Could not parse any handles from this file.", variant: "destructive" });
+        return;
+      }
+
+      // Get existing feeds to skip duplicates
+      const { data: existingFeeds } = await supabase
+        .from("feeds")
+        .select("url")
+        .eq("user_id", user.id);
+
+      const existingUrls = new Set((existingFeeds || []).map((f: any) => f.url));
+
+      const newFeeds = handles
+        .filter((h) => !existingUrls.has(`x:@${h}`))
+        .map((h) => ({
+          name: `@${h}`,
+          url: `x:@${h}`,
+          type: "news",
+          user_id: user.id,
+        }));
+
+      let imported = 0;
+      for (let i = 0; i < newFeeds.length; i += 50) {
+        const batch = newFeeds.slice(i, i + 50);
+        const { error: insertError } = await supabase.from("feeds").insert(batch);
+        if (!insertError) imported += batch.length;
+      }
+
+      const skipped = handles.length - newFeeds.length;
       toast({
         title: "X import complete!",
-        description: `Imported ${data.imported} new feeds, skipped ${data.skipped} duplicates (${data.total} total following).`,
+        description: `Imported ${imported} new feeds, skipped ${skipped} duplicates (${handles.length} total).`,
       });
       fetchFeeds();
     } catch (e: any) {
       toast({ title: "Import failed", description: e.message, variant: "destructive" });
     } finally {
       setImportingX(false);
+      if (xFileInputRef.current) xFileInputRef.current.value = "";
     }
   };
 
