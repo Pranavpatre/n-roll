@@ -464,6 +464,20 @@ const Admin = () => {
           )}
         </section>
 
+        {/* Import X Following */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-lg text-foreground">Import X Following</h2>
+            <Button variant="outline" size="sm" onClick={handleImportXFollowing} disabled={importingX} className="gap-1.5">
+              {importingX ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+              {importingX ? "Importing…" : "Import from @pranavpatre"}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Fetch all accounts you follow on X and add them as news feeds. Duplicates will be skipped automatically.
+          </p>
+        </section>
+
         {/* Feeds Table */}
         <section className="space-y-4">
           <h2 className="font-display text-lg text-foreground">Feeds ({feeds.length})</h2>
