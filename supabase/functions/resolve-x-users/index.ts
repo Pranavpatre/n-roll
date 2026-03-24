@@ -1,11 +1,11 @@
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
@@ -17,75 +17,64 @@ Deno.serve(async (req) => {
       });
     }
 
-    const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
-    if (!firecrawlKey) {
-      return new Response(JSON.stringify({ error: 'FIRECRAWL_API_KEY not configured' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
     const resolved: { id: string; username: string }[] = [];
     const failed: string[] = [];
 
-    // Process in batches of 10 to avoid overwhelming Firecrawl
-    for (let i = 0; i < user_ids.length; i += 10) {
-      const batch = user_ids.slice(i, i + 10);
+    // Process in batches of 5 with delays to avoid rate limiting
+    for (let i = 0; i < user_ids.length; i += 5) {
+      const batch = user_ids.slice(i, i + 5);
 
       const results = await Promise.allSettled(
         batch.map(async (userId: string) => {
-          const url = `https://x.com/intent/user?user_id=${userId}`;
-          const resp = await fetch('https://api.firecrawl.dev/v1/scrape', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${firecrawlKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              url,
-              formats: ['links'],
-              waitFor: 2000,
-            }),
-          });
+          try {
+            // Follow the redirect from x.com/intent/user?user_id=X
+            // Using redirect: 'manual' to capture the Location header
+            const resp = await fetch(`https://x.com/intent/user?user_id=${userId}`, {
+              redirect: 'manual',
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (compatible; bot)',
+              },
+            });
 
-          if (!resp.ok) {
-            const errText = await resp.text();
-            console.error(`Firecrawl error for ${userId}: ${resp.status} ${errText}`);
-            return { id: userId, username: null };
-          }
-
-          const data = await resp.json();
-          // The page redirects to x.com/<username>, check metadata or sourceURL
-          const sourceUrl = data?.data?.metadata?.sourceURL || data?.data?.metadata?.url || '';
-          const ogUrl = data?.data?.metadata?.ogUrl || '';
-          
-          // Try to extract username from the resolved URL
-          for (const candidate of [sourceUrl, ogUrl]) {
-            const match = candidate.match(/(?:x\.com|twitter\.com)\/([A-Za-z0-9_]+)\/?$/);
-            if (match && !['intent', 'i', 'home', 'search', 'explore', 'notifications'].includes(match[1].toLowerCase())) {
+            // Check for redirect (301/302/303/307/308)
+            const location = resp.headers.get('location') || '';
+            const match = location.match(/(?:x\.com|twitter\.com)\/([A-Za-z0-9_]+)\/?$/);
+            if (match && !['intent', 'i', 'home', 'search', 'explore', 'notifications', 'login'].includes(match[1].toLowerCase())) {
               return { id: userId, username: match[1] };
             }
-          }
 
-          return { id: userId, username: null };
+            // If no redirect, try reading the response body for meta refresh or og:url
+            if (resp.status === 200) {
+              const html = await resp.text();
+              // Look for screen_name or username in the HTML
+              const ogMatch = html.match(/(?:x\.com|twitter\.com)\/([A-Za-z0-9_]{1,15})(?:["'\s?/])/);
+              if (ogMatch && !['intent', 'i', 'home', 'search', 'explore', 'notifications', 'login', 'account'].includes(ogMatch[1].toLowerCase())) {
+                return { id: userId, username: ogMatch[1] };
+              }
+            }
+
+            return { id: userId, username: null };
+          } catch (e) {
+            console.error(`Error resolving ${userId}:`, e.message);
+            return { id: userId, username: null };
+          }
         })
       );
 
       for (const result of results) {
         if (result.status === 'fulfilled' && result.value.username) {
-          resolved.push(result.value);
+          resolved.push(result.value as { id: string; username: string });
         } else {
           const id = result.status === 'fulfilled' ? result.value.id : batch[0];
           failed.push(id);
         }
       }
 
-      // Log progress
-      console.log(`Progress: ${Math.min(i + 10, user_ids.length)}/${user_ids.length} processed, ${resolved.length} resolved`);
+      console.log(`Progress: ${Math.min(i + 5, user_ids.length)}/${user_ids.length} processed, ${resolved.length} resolved`);
 
-      // Small delay between batches
-      if (i + 10 < user_ids.length) {
-        await new Promise((r) => setTimeout(r, 500));
+      // Delay between batches to be polite
+      if (i + 5 < user_ids.length) {
+        await new Promise((r) => setTimeout(r, 1000));
       }
     }
 
