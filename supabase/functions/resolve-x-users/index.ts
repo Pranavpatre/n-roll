@@ -17,53 +17,75 @@ Deno.serve(async (req) => {
       });
     }
 
-    const bearerToken = Deno.env.get('TWITTER_BEARER_TOKEN');
-    if (!bearerToken) {
-      return new Response(JSON.stringify({ error: 'TWITTER_BEARER_TOKEN not configured' }), {
+    const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
+    if (!firecrawlKey) {
+      return new Response(JSON.stringify({ error: 'FIRECRAWL_API_KEY not configured' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const resolved: { id: string; username: string; name: string }[] = [];
+    const resolved: { id: string; username: string }[] = [];
     const failed: string[] = [];
 
-    // Twitter allows up to 100 IDs per request
-    for (let i = 0; i < user_ids.length; i += 100) {
-      const batch = user_ids.slice(i, i + 100);
-      const ids = batch.join(',');
+    // Process in batches of 10 to avoid overwhelming Firecrawl
+    for (let i = 0; i < user_ids.length; i += 10) {
+      const batch = user_ids.slice(i, i + 10);
 
-      const resp = await fetch(
-        `https://api.x.com/2/users?ids=${ids}&user.fields=username,name`,
-        {
-          headers: { Authorization: `Bearer ${bearerToken}` },
-        }
+      const results = await Promise.allSettled(
+        batch.map(async (userId: string) => {
+          const url = `https://x.com/intent/user?user_id=${userId}`;
+          const resp = await fetch('https://api.firecrawl.dev/v1/scrape', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${firecrawlKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              url,
+              formats: ['links'],
+              waitFor: 2000,
+            }),
+          });
+
+          if (!resp.ok) {
+            const errText = await resp.text();
+            console.error(`Firecrawl error for ${userId}: ${resp.status} ${errText}`);
+            return { id: userId, username: null };
+          }
+
+          const data = await resp.json();
+          // The page redirects to x.com/<username>, check metadata or sourceURL
+          const sourceUrl = data?.data?.metadata?.sourceURL || data?.data?.metadata?.url || '';
+          const ogUrl = data?.data?.metadata?.ogUrl || '';
+          
+          // Try to extract username from the resolved URL
+          for (const candidate of [sourceUrl, ogUrl]) {
+            const match = candidate.match(/(?:x\.com|twitter\.com)\/([A-Za-z0-9_]+)\/?$/);
+            if (match && !['intent', 'i', 'home', 'search', 'explore', 'notifications'].includes(match[1].toLowerCase())) {
+              return { id: userId, username: match[1] };
+            }
+          }
+
+          return { id: userId, username: null };
+        })
       );
 
-      if (!resp.ok) {
-        const errBody = await resp.text();
-        console.error(`Twitter API error ${resp.status}: ${errBody}`);
-        // If credits depleted, try Firecrawl fallback for this batch
-        if (resp.status === 402 || resp.status === 429) {
-          failed.push(...batch);
-          continue;
-        }
-        return new Response(JSON.stringify({ error: `Twitter API error: ${resp.status} - ${errBody}` }), {
-          status: 502,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      const data = await resp.json();
-      if (data.data) {
-        for (const user of data.data) {
-          resolved.push({ id: user.id, username: user.username, name: user.name });
+      for (const result of results) {
+        if (result.status === 'fulfilled' && result.value.username) {
+          resolved.push(result.value);
+        } else {
+          const id = result.status === 'fulfilled' ? result.value.id : batch[0];
+          failed.push(id);
         }
       }
 
-      // Rate limit: small delay between batches
-      if (i + 100 < user_ids.length) {
-        await new Promise((r) => setTimeout(r, 1000));
+      // Log progress
+      console.log(`Progress: ${Math.min(i + 10, user_ids.length)}/${user_ids.length} processed, ${resolved.length} resolved`);
+
+      // Small delay between batches
+      if (i + 10 < user_ids.length) {
+        await new Promise((r) => setTimeout(r, 500));
       }
     }
 
