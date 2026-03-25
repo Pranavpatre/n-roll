@@ -119,14 +119,6 @@ const Admin = () => {
 
   const deriveNameFromUrl = (url: string, type: string): string => {
     const trimmed = url.trim();
-    if (isXHandle(trimmed)) {
-      let handle = trimmed;
-      if (handle.includes("twitter.com/") || handle.includes("x.com/")) {
-        handle = handle.split("/").pop()?.replace("@", "") || handle;
-      }
-      handle = handle.replace("@", "");
-      return `@${handle}`;
-    }
     if (isYouTubeUrl(trimmed)) {
       try {
         const urlObj = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
