@@ -149,10 +149,6 @@ const Admin = () => {
     fetchDigests();
   }, [fetchFeeds, fetchDigests]);
 
-  const isXHandle = (input: string) => {
-    const trimmed = input.trim();
-    return trimmed.startsWith("@") || trimmed.includes("twitter.com/") || trimmed.includes("x.com/");
-  };
 
   const isYouTubeUrl = (input: string) => {
     return input.includes("youtube.com") || input.includes("youtu.be");
