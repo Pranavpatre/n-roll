@@ -85,7 +85,7 @@ const Admin = () => {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const providerToken = session?.provider_token;
-      if (providerToken) {
+      if (providerToken && event === "SIGNED_IN") {
         setGmailConnected(true);
         const pendingScan = sessionStorage.getItem("pending_gmail_scan");
         if (pendingScan) {
