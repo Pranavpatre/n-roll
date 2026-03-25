@@ -79,7 +79,48 @@ const Admin = () => {
   const [scanningGmail, setScanningGmail] = useState(false);
   const [gmailResults, setGmailResults] = useState<{ name: string; domain: string; rss: string | null; sampleSubject: string }[]>([]);
   const [addedGmailDomains, setAddedGmailDomains] = useState<Set<string>>(new Set());
-  
+  const [gmailConnected, setGmailConnected] = useState(false);
+
+  // After Google OAuth redirect, detect provider_token and auto-scan
+  useEffect(() => {
+    const checkProviderToken = async () => {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      const providerToken = currentSession?.provider_token;
+      if (providerToken) {
+        setGmailConnected(true);
+        // Check if we were in the middle of a Gmail scan (flag set before redirect)
+        const pendingScan = sessionStorage.getItem("pending_gmail_scan");
+        if (pendingScan) {
+          sessionStorage.removeItem("pending_gmail_scan");
+          runGmailScan(providerToken);
+        }
+      }
+    };
+    checkProviderToken();
+  }, []);
+
+  const runGmailScan = async (providerToken: string) => {
+    setScanningGmail(true);
+    setGmailResults([]);
+    try {
+      const { data, error } = await supabase.functions.invoke("scan-gmail", {
+        body: { providerToken },
+      });
+      if (error) throw error;
+      const newsletters = data?.newsletters || [];
+      if (newsletters.length === 0) {
+        toast({ title: "No AI newsletters found", description: "We didn't find any AI-related newsletters in your Gmail." });
+      } else {
+        toast({ title: `Found ${newsletters.length} AI newsletters`, description: "Review and add them below." });
+      }
+      setGmailResults(newsletters);
+    } catch (e: any) {
+      toast({ title: "Gmail scan failed", description: e.message, variant: "destructive" });
+    } finally {
+      setScanningGmail(false);
+    }
+  };
+
   const fetchFeeds = useCallback(async () => {
     if (!user) return;
     const { data } = await supabase
@@ -108,10 +149,6 @@ const Admin = () => {
     fetchDigests();
   }, [fetchFeeds, fetchDigests]);
 
-  const isXHandle = (input: string) => {
-    const trimmed = input.trim();
-    return trimmed.startsWith("@") || trimmed.includes("twitter.com/") || trimmed.includes("x.com/");
-  };
 
   const isYouTubeUrl = (input: string) => {
     return input.includes("youtube.com") || input.includes("youtu.be");
@@ -244,52 +281,29 @@ const Admin = () => {
   };
 
   const handleScanGmail = async () => {
-    setScanningGmail(true);
-    setGmailResults([]);
-    try {
-      // Sign in with Google to get Gmail access
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
-        extraParams: {
-          prompt: "consent",
-          access_type: "offline",
-          scope: "https://www.googleapis.com/auth/gmail.readonly",
-        },
-      });
+    // If we already have a provider token, scan directly
+    const { data: { session: currentSession } } = await supabase.auth.getSession();
+    const providerToken = currentSession?.provider_token;
 
-      if (result.error) {
-        toast({ title: "Google sign-in failed", description: String(result.error), variant: "destructive" });
-        setScanningGmail(false);
-        return;
-      }
+    if (providerToken) {
+      runGmailScan(providerToken);
+      return;
+    }
 
-      // After redirect, we need the provider token
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      const providerToken = currentSession?.provider_token;
+    // Otherwise, redirect to Google OAuth — set flag so we auto-scan on return
+    sessionStorage.setItem("pending_gmail_scan", "true");
+    const result = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: `${window.location.origin}/admin`,
+      extraParams: {
+        prompt: "consent",
+        access_type: "offline",
+        scope: "https://www.googleapis.com/auth/gmail.readonly",
+      },
+    });
 
-      if (!providerToken) {
-        toast({ title: "No Gmail access", description: "Could not get Gmail access token. Please try again.", variant: "destructive" });
-        setScanningGmail(false);
-        return;
-      }
-
-      const { data, error } = await supabase.functions.invoke("scan-gmail", {
-        body: { providerToken },
-      });
-
-      if (error) throw error;
-
-      const newsletters = data?.newsletters || [];
-      if (newsletters.length === 0) {
-        toast({ title: "No AI newsletters found", description: "We didn't find any AI-related newsletters in your Gmail." });
-      } else {
-        toast({ title: `Found ${newsletters.length} AI newsletters`, description: "Review and add them below." });
-      }
-      setGmailResults(newsletters);
-    } catch (e: any) {
-      toast({ title: "Gmail scan failed", description: e.message, variant: "destructive" });
-    } finally {
-      setScanningGmail(false);
+    if (result.error) {
+      sessionStorage.removeItem("pending_gmail_scan");
+      toast({ title: "Google sign-in failed", description: String(result.error), variant: "destructive" });
     }
   };
 
