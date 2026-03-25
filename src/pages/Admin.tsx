@@ -79,7 +79,7 @@ const Admin = () => {
   const [scanningGmail, setScanningGmail] = useState(false);
   const [gmailResults, setGmailResults] = useState<{ name: string; domain: string; rss: string | null; sampleSubject: string }[]>([]);
   const [addedGmailDomains, setAddedGmailDomains] = useState<Set<string>>(new Set());
-  const [importingX, setImportingX] = useState(false);
+  
   const fetchFeeds = useCallback(async () => {
     if (!user) return;
     const { data } = await supabase
