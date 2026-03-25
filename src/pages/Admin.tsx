@@ -81,22 +81,28 @@ const Admin = () => {
   const [addedGmailDomains, setAddedGmailDomains] = useState<Set<string>>(new Set());
   const [gmailConnected, setGmailConnected] = useState(false);
 
-  // After Google OAuth redirect, detect provider_token and auto-scan
+  // After Google OAuth redirect, detect provider_token via auth state change
   useEffect(() => {
-    const checkProviderToken = async () => {
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      const providerToken = currentSession?.provider_token;
-      if (providerToken) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      const providerToken = session?.provider_token;
+      if (providerToken && event === "SIGNED_IN") {
         setGmailConnected(true);
-        // Check if we were in the middle of a Gmail scan (flag set before redirect)
         const pendingScan = sessionStorage.getItem("pending_gmail_scan");
         if (pendingScan) {
           sessionStorage.removeItem("pending_gmail_scan");
           runGmailScan(providerToken);
         }
       }
-    };
-    checkProviderToken();
+    });
+
+    // Also check current session on mount
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.provider_token) {
+        setGmailConnected(true);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const runGmailScan = async (providerToken: string) => {
@@ -293,10 +299,9 @@ const Admin = () => {
     // Otherwise, redirect to Google OAuth — set flag so we auto-scan on return
     sessionStorage.setItem("pending_gmail_scan", "true");
     const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: `${window.location.origin}/admin`,
+      redirect_uri: window.location.origin,
       extraParams: {
         prompt: "consent",
-        access_type: "offline",
         scope: "https://www.googleapis.com/auth/gmail.readonly",
       },
     });
