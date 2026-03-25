@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { Shield, Plus, Trash2, RefreshCw, ArrowLeft, Newspaper, Mic, FileText, Youtube, Twitter, Mail, Check, Upload } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Shield, Plus, Trash2, RefreshCw, ArrowLeft, Newspaper, Mic, FileText, Youtube, Mail, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -43,9 +43,9 @@ const getInputConfig = (type: string) => {
   switch (type) {
     case "news":
       return {
-        placeholder: "YouTube channel URL or X/Twitter handle (e.g. @elikisd)",
-        hint: "Paste a YouTube channel link or an X/Twitter handle",
-        icons: [Youtube, Twitter],
+        placeholder: "Google News RSS feed URL",
+        hint: "Paste a Google News RSS feed URL",
+        icons: [Newspaper],
       };
     case "podcast":
       return {
@@ -79,7 +79,7 @@ const Admin = () => {
   const [scanningGmail, setScanningGmail] = useState(false);
   const [gmailResults, setGmailResults] = useState<{ name: string; domain: string; rss: string | null; sampleSubject: string }[]>([]);
   const [addedGmailDomains, setAddedGmailDomains] = useState<Set<string>>(new Set());
-  const [importingX, setImportingX] = useState(false);
+  
   const fetchFeeds = useCallback(async () => {
     if (!user) return;
     const { data } = await supabase
@@ -119,14 +119,6 @@ const Admin = () => {
 
   const deriveNameFromUrl = (url: string, type: string): string => {
     const trimmed = url.trim();
-    if (isXHandle(trimmed)) {
-      let handle = trimmed;
-      if (handle.includes("twitter.com/") || handle.includes("x.com/")) {
-        handle = handle.split("/").pop()?.replace("@", "") || handle;
-      }
-      handle = handle.replace("@", "");
-      return `@${handle}`;
-    }
     if (isYouTubeUrl(trimmed)) {
       try {
         const urlObj = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
@@ -160,14 +152,6 @@ const Admin = () => {
 
       if (feedType === "newsletter") {
         sourceType = "rss";
-      } else if (isXHandle(finalUrl)) {
-        let handle = finalUrl;
-        if (handle.includes("twitter.com/") || handle.includes("x.com/")) {
-          handle = "@" + handle.split("/").pop()?.replace("@", "");
-        }
-        if (!handle.startsWith("@")) handle = "@" + handle;
-        finalUrl = `x:${handle}`;
-        sourceType = "x";
       } else if (isYouTubeUrl(finalUrl)) {
         const { data: rssData, error: rssError } = await supabase.functions.invoke("youtube-to-rss", {
           body: { youtubeUrl: finalUrl },
@@ -329,100 +313,6 @@ const Admin = () => {
     }
   };
 
-  const xFileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleImportXFollowing = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !user) return;
-    setImportingX(true);
-    try {
-      const text = await file.text();
-      const jsonStr = text.replace(/^window\.YTD\.following\.part\d+\s*=\s*/, "");
-      const parsed = JSON.parse(jsonStr);
-
-      // Extract user IDs from the file (format: twitter.com/intent/user?user_id=XXX)
-      const userIds: string[] = parsed
-        .map((entry: any) => {
-          const link = entry?.following?.userLink || "";
-          const idMatch = link.match(/user_id=(\d+)/);
-          const handleMatch = link.match(/(?:x\.com|twitter\.com)\/([^/?]+)$/);
-          return idMatch ? { type: "id", value: idMatch[1] } : handleMatch ? { type: "handle", value: handleMatch[1] } : null;
-        })
-        .filter(Boolean);
-
-      if (userIds.length === 0) {
-        toast({ title: "No accounts found", description: "Could not parse any accounts from this file.", variant: "destructive" });
-        return;
-      }
-
-      // Separate IDs that need resolving from direct handles
-      const idsToResolve = userIds.filter((u: any) => u.type === "id").map((u: any) => u.value);
-      const directHandles = userIds.filter((u: any) => u.type === "handle").map((u: any) => u.value);
-
-      let resolvedHandles: string[] = [...directHandles];
-
-      if (idsToResolve.length > 0) {
-        toast({ title: "Resolving usernames...", description: `Looking up ${idsToResolve.length} user IDs via Twitter API...` });
-
-        const { data: resolveData, error: resolveError } = await supabase.functions.invoke("resolve-x-users", {
-          body: { user_ids: idsToResolve },
-        });
-
-        if (resolveError) throw new Error(`Failed to resolve user IDs: ${resolveError.message}`);
-
-        if (resolveData?.resolved) {
-          resolvedHandles.push(...resolveData.resolved.map((u: any) => u.username));
-        }
-
-        const failedCount = resolveData?.failed?.length || 0;
-        if (failedCount > 0) {
-          console.warn(`Failed to resolve ${failedCount} user IDs`);
-        }
-      }
-
-      if (resolvedHandles.length === 0) {
-        toast({ title: "No accounts resolved", description: "Could not resolve any usernames. Twitter API credits may be depleted.", variant: "destructive" });
-        return;
-      }
-
-      // Get existing feeds to skip duplicates
-      const { data: existingFeeds } = await supabase
-        .from("feeds")
-        .select("url")
-        .eq("user_id", user.id);
-
-      const existingUrls = new Set((existingFeeds || []).map((f: any) => f.url));
-
-      const newFeeds = resolvedHandles
-        .filter((h) => !existingUrls.has(`x:@${h}`))
-        .map((h) => ({
-          name: `@${h}`,
-          url: `x:@${h}`,
-          type: "news",
-          user_id: user.id,
-        }));
-
-      let imported = 0;
-      for (let i = 0; i < newFeeds.length; i += 50) {
-        const batch = newFeeds.slice(i, i + 50);
-        const { error: insertError } = await supabase.from("feeds").insert(batch);
-        if (!insertError) imported += batch.length;
-      }
-
-      const skipped = resolvedHandles.length - newFeeds.length;
-      const failedCount = idsToResolve.length - (resolvedHandles.length - directHandles.length);
-      toast({
-        title: "X import complete!",
-        description: `Imported ${imported} new feeds, skipped ${skipped} duplicates${failedCount > 0 ? `, ${failedCount} IDs unresolved` : ""} (${userIds.length} total in file).`,
-      });
-      fetchFeeds();
-    } catch (e: any) {
-      toast({ title: "Import failed", description: e.message, variant: "destructive" });
-    } finally {
-      setImportingX(false);
-      if (xFileInputRef.current) xFileInputRef.current.value = "";
-    }
-  };
 
   const TypeIcon = ({ type }: { type: string }) => {
     const opt = typeOptions.find((t) => t.value === type) || typeOptions[0];
@@ -557,29 +447,6 @@ const Admin = () => {
               </Table>
             </div>
           )}
-        </section>
-
-        {/* Import X Following */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-display text-lg text-foreground">Import X Following</h2>
-            <div>
-              <input
-                ref={xFileInputRef}
-                type="file"
-                accept=".js,.json"
-                className="hidden"
-                onChange={handleImportXFollowing}
-              />
-              <Button variant="outline" size="sm" onClick={() => xFileInputRef.current?.click()} disabled={importingX} className="gap-1.5">
-                {importingX ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                {importingX ? "Importing…" : "Upload following.js"}
-              </Button>
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Go to <span className="font-medium">X → Settings → Your Account → Download an archive</span>, then upload the <code className="bg-muted px-1 rounded">data/following.js</code> file from the zip.
-          </p>
         </section>
 
         {/* Feeds Table */}

@@ -6,9 +6,6 @@ verify_jwt = false
 [functions.fetch-rss]
 verify_jwt = false
 
-[functions.fetch-x]
-verify_jwt = false
-
 [functions.summarize]
 verify_jwt = false
 
@@ -16,7 +13,4 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.fetch-gmail-content]
-verify_jwt = false
-
-[functions.fetch-x-following]
 verify_jwt = false

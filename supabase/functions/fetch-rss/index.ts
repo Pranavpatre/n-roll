@@ -121,8 +121,7 @@ serve(async (req) => {
     const allItems: any[] = [];
 
     // Separate feeds by source type
-    const rssFeeds = feeds.filter((f: any) => !f.url.startsWith("x:") && !f.url.startsWith("gmail:"));
-    const xFeeds = feeds.filter((f: any) => f.url.startsWith("x:"));
+    const rssFeeds = feeds.filter((f: any) => !f.url.startsWith("gmail:"));
     const gmailFeeds = feeds.filter((f: any) => f.url.startsWith("gmail:"));
 
     // Process RSS/YouTube feeds
@@ -161,46 +160,6 @@ serve(async (req) => {
         }
       } catch (e) {
         console.error(`Error fetching ${feed.url}:`, e);
-      }
-    }
-
-    // Process X/Twitter feeds via fetch-x function
-    for (const feed of xFeeds) {
-      try {
-        const handle = feed.url.replace("x:", "");
-        console.log(`Fetching X content for ${handle}`);
-
-        const xRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/fetch-x`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
-          },
-          body: JSON.stringify({ handle }),
-        });
-
-        if (!xRes.ok) {
-          console.error(`fetch-x failed for ${handle}: ${xRes.status}`);
-          continue;
-        }
-
-        const xData = await xRes.json();
-        const xItems = xData?.items || [];
-
-        for (const item of xItems) {
-          if (existingUrls.has(item.link)) continue;
-          allItems.push({
-            feedId: feed.id,
-            feedName: feed.name,
-            feedType: feed.type,
-            title: item.title,
-            link: item.link,
-            description: item.description.slice(0, 2000),
-            pubDate: item.pubDate || new Date().toISOString(),
-          });
-        }
-      } catch (e) {
-        console.error(`Error fetching X feed ${feed.url}:`, e);
       }
     }
 
