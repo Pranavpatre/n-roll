@@ -152,14 +152,6 @@ const Admin = () => {
 
       if (feedType === "newsletter") {
         sourceType = "rss";
-      } else if (isXHandle(finalUrl)) {
-        let handle = finalUrl;
-        if (handle.includes("twitter.com/") || handle.includes("x.com/")) {
-          handle = "@" + handle.split("/").pop()?.replace("@", "");
-        }
-        if (!handle.startsWith("@")) handle = "@" + handle;
-        finalUrl = `x:${handle}`;
-        sourceType = "x";
       } else if (isYouTubeUrl(finalUrl)) {
         const { data: rssData, error: rssError } = await supabase.functions.invoke("youtube-to-rss", {
           body: { youtubeUrl: finalUrl },
