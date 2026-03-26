@@ -84,21 +84,30 @@ const Admin = () => {
   // After Google OAuth redirect, detect provider_token via auth state change
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("[Gmail] Auth state change:", event, "provider_token:", !!session?.provider_token);
       const providerToken = session?.provider_token;
-      if (providerToken && event === "SIGNED_IN") {
+      if (providerToken) {
         setGmailConnected(true);
         const pendingScan = sessionStorage.getItem("pending_gmail_scan");
         if (pendingScan) {
           sessionStorage.removeItem("pending_gmail_scan");
+          console.log("[Gmail] Auto-triggering scan after OAuth redirect");
           runGmailScan(providerToken);
         }
       }
     });
 
-    // Also check current session on mount
+    // Also check current session on mount for pending scan
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log("[Gmail] Session check - provider_token:", !!session?.provider_token);
       if (session?.provider_token) {
         setGmailConnected(true);
+        const pendingScan = sessionStorage.getItem("pending_gmail_scan");
+        if (pendingScan) {
+          sessionStorage.removeItem("pending_gmail_scan");
+          console.log("[Gmail] Running pending scan from session");
+          runGmailScan(session.provider_token);
+        }
       }
     });
 
