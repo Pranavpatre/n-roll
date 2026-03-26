@@ -299,6 +299,7 @@ const Admin = () => {
     // If we already have a provider token, scan directly
     const { data: { session: currentSession } } = await supabase.auth.getSession();
     const providerToken = currentSession?.provider_token;
+    console.log("[Gmail] handleScanGmail - provider_token available:", !!providerToken);
 
     if (providerToken) {
       runGmailScan(providerToken);
@@ -307,16 +308,19 @@ const Admin = () => {
 
     // Otherwise, redirect to Google OAuth — set flag so we auto-scan on return
     sessionStorage.setItem("pending_gmail_scan", "true");
+    console.log("[Gmail] Redirecting to Google OAuth for gmail.readonly scope");
     const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
+      redirect_uri: `${window.location.origin}/admin`,
       extraParams: {
         prompt: "consent",
-        scope: "https://www.googleapis.com/auth/gmail.readonly",
+        access_type: "offline",
+        scope: "openid email profile https://www.googleapis.com/auth/gmail.readonly",
       },
     });
 
     if (result.error) {
       sessionStorage.removeItem("pending_gmail_scan");
+      console.error("[Gmail] OAuth error:", result.error);
       toast({ title: "Google sign-in failed", description: String(result.error), variant: "destructive" });
     }
   };
