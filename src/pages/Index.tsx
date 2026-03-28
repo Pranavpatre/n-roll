@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 interface DigestItem {
   id?: string;
-  type: "podcast" | "newsletter" | "news" | "article";
+  type: "podcast" | "news" | "article";
   title: string;
   source: string;
   guest?: string;

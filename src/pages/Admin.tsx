@@ -599,65 +599,6 @@ const Admin = () => {
           )}
         </section>
 
-        {/* Scan Gmail */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-display text-lg text-foreground">Scan Gmail for Newsletters</h2>
-            <Button variant="outline" size="sm" onClick={handleScanGmail} disabled={scanningGmail} className="gap-1.5">
-              {scanningGmail ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
-              {scanningGmail ? "Scanning…" : "Scan Gmail"}
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Connect your Google account to find AI newsletters you're subscribed to. We only read email headers (sender & subject) — never email content.
-          </p>
-          {gmailResults.length > 0 && (
-            <div className="rounded-lg border border-border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Newsletter</TableHead>
-                    <TableHead className="hidden sm:table-cell">Sample Subject</TableHead>
-                    <TableHead className="w-24">RSS</TableHead>
-                    <TableHead className="w-16"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {gmailResults.map((nl) => (
-                    <TableRow key={nl.domain}>
-                      <TableCell>
-                        <div>
-                          <span className="font-medium">{nl.name}</span>
-                          <span className="block text-xs text-muted-foreground">{nl.domain}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell text-muted-foreground text-xs truncate max-w-[300px]">
-                        {nl.sampleSubject}
-                      </TableCell>
-                      <TableCell>
-                        {nl.rss ? (
-                          <span className="text-xs text-green-500">RSS</span>
-                        ) : (
-                          <span className="text-xs text-amber-500">Gmail</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {!addedGmailDomains.has(nl.domain) ? (
-                          <Button size="sm" variant="ghost" onClick={() => handleAddGmailNewsletter(nl)} className="h-7 gap-1">
-                            <Plus className="h-3 w-3" /> Add
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-green-500 flex items-center gap-1"><Check className="h-3 w-3" /> Added</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </section>
-
         {/* Feeds Table */}
         <section className="space-y-4">
           <h2 className="font-display text-lg text-foreground">Feeds ({feeds.length})</h2>
