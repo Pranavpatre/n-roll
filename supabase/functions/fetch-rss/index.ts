@@ -175,8 +175,9 @@ serve(async (req) => {
     const existingUrls = new Set((existingDigests || []).map((d: any) => d.url));
     const existingTitles = (existingDigests || []).map((d: any) => normalizeTitle(d.title));
 
-    // 7-day lookback window
-    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    // Lookback windows: 7 days for news, 30 days for everything else
+    const newsCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const defaultCutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const allItems: any[] = [];
     const seenTitles: string[] = [...existingTitles];
 
@@ -195,10 +196,12 @@ serve(async (req) => {
         const xml = await res.text();
         const items = extractItems(xml);
 
+        const cutoff = feed.type === "news" ? newsCutoff : defaultCutoff;
+        const perFeedCap = feed.type === "news" ? 50 : 30;
         const skipAIFilter = feed.url.includes("arxiv.org") || feed.url.includes("hnrss.org");
         let added = 0;
         for (const item of items) {
-          if (added >= 8) break;
+          if (added >= perFeedCap) break;
           if (!item.link || item.link.length < 10) continue;
           if (existingUrls.has(item.link)) continue;
           const pubDate = item.pubDate ? new Date(item.pubDate) : new Date();

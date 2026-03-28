@@ -106,9 +106,26 @@ Return ONLY valid JSON:
       summary.topic = item.title.replace(/^RT @\w+:\s*/, "").slice(0, 80);
     }
 
-    // Save digest to DB
-    const now = new Date();
-    const dateStr = `Today, ${now.getHours()}:${String(now.getMinutes()).padStart(2, "0")}`;
+    // Save digest to DB — use article's original publication date/time
+    let dateStr: string;
+    if (item.pubDate) {
+      const pub = new Date(item.pubDate);
+      const now = new Date();
+      const isToday = pub.toDateString() === now.toDateString();
+      const isYesterday = new Date(now.getTime() - 86400000).toDateString() === pub.toDateString();
+      const timeStr = pub.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+      if (isToday) {
+        dateStr = `Today, ${timeStr}`;
+      } else if (isYesterday) {
+        dateStr = `Yesterday, ${timeStr}`;
+      } else {
+        const dateLabel = pub.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        dateStr = `${dateLabel}, ${timeStr}`;
+      }
+    } else {
+      const now = new Date();
+      dateStr = `Today, ${now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}`;
+    }
 
     const { data: digest, error: digestError } = await supabase
       .from("digests")
