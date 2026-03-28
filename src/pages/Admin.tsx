@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Shield, Plus, Trash2, RefreshCw, ArrowLeft, Newspaper, Mic, FileText, Youtube, Mail, Check } from "lucide-react";
+import { Shield, Plus, Trash2, RefreshCw, ArrowLeft, Newspaper, Mic, FileText, Youtube, Mail, Check, BookOpen, Search, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -74,7 +74,7 @@ interface Digest {
 const typeOptions = [
   { value: "news", label: "News", icon: Newspaper, color: "text-news" },
   { value: "podcast", label: "Podcast", icon: Mic, color: "text-podcast" },
-  { value: "newsletter", label: "Newsletter", icon: FileText, color: "text-newsletter" },
+  { value: "article", label: "Article", icon: FileText, color: "text-purple-400" },
 ] as const;
 
 const getInputConfig = (type: string) => {
@@ -91,10 +91,10 @@ const getInputConfig = (type: string) => {
         hint: "Paste a YouTube channel link",
         icons: [Youtube],
       };
-    case "newsletter":
+    case "article":
       return {
-        placeholder: "Newsletter RSS feed URL",
-        hint: "Paste the RSS feed URL directly",
+        placeholder: "Substack or blog RSS feed URL (e.g. simonwillison.substack.com)",
+        hint: "Paste a Substack URL or any blog RSS feed",
         icons: [FileText],
       };
     default:
@@ -118,6 +118,10 @@ const Admin = () => {
   const [gmailResults, setGmailResults] = useState<{ name: string; domain: string; rss: string | null; sampleSubject: string }[]>([]);
   const [addedGmailDomains, setAddedGmailDomains] = useState<Set<string>>(new Set());
   const [gmailToken, setGmailToken] = useState<string | null>(null);
+  const [addedSuggestions, setAddedSuggestions] = useState<Set<string>>(new Set());
+  const [discoveringYT, setDiscoveringYT] = useState(false);
+  const [ytResults, setYtResults] = useState<{ name: string; channelId: string; description: string; subscriberCount: string; thumbnail: string }[]>([]);
+  const [addedYTChannels, setAddedYTChannels] = useState<Set<string>>(new Set());
 
   // No longer need auth state listener for Gmail — using direct Google OAuth popup
 
@@ -161,7 +165,7 @@ const Admin = () => {
       .select("id, title, source, type, date, url")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .limit(100);
+      .limit(200);
     setDigests(data || []);
     setDigestLoading(false);
   }, [user]);
@@ -209,7 +213,12 @@ const Admin = () => {
       let sourceType = "rss";
       const feedName = deriveNameFromUrl(feedUrl, feedType);
 
-      if (feedType === "newsletter") {
+      if (feedType === "article") {
+        // Auto-detect Substack URLs and append /feed if needed
+        if (finalUrl.includes("substack.com") && !finalUrl.endsWith("/feed")) {
+          const url = new URL(finalUrl.startsWith("http") ? finalUrl : `https://${finalUrl}`);
+          finalUrl = `${url.origin}/feed`;
+        }
         sourceType = "rss";
       } else if (isYouTubeUrl(finalUrl)) {
         const { data: rssData, error: rssError } = await supabase.functions.invoke("youtube-to-rss", {
@@ -291,12 +300,14 @@ const Admin = () => {
       toast({ title: `Found ${items.length} new items`, description: "Generating AI summaries…" });
 
       let successCount = 0;
-      for (const item of items) {
-        try {
-          const { error } = await supabase.functions.invoke("summarize", { body: { item } });
-          if (error) continue;
-          successCount++;
-        } catch {}
+      const BATCH_SIZE = 5;
+      for (let i = 0; i < items.length; i += BATCH_SIZE) {
+        const batch = items.slice(i, i + BATCH_SIZE);
+        toast({ title: `Summarizing...`, description: `${i + 1}–${Math.min(i + BATCH_SIZE, items.length)} of ${items.length}` });
+        const results = await Promise.allSettled(
+          batch.map((item: any) => supabase.functions.invoke("summarize", { body: { item } }))
+        );
+        successCount += results.filter((r) => r.status === "fulfilled" && !(r as PromiseFulfilledResult<any>).value.error).length;
       }
 
       toast({ title: "Refresh complete!", description: `Generated ${successCount} new digests.` });
@@ -333,13 +344,94 @@ const Admin = () => {
       const { error } = await supabase.from("feeds").insert({
         name: newsletter.name,
         url: feedUrl,
-        type: "newsletter",
+        type: "article",
         user_id: user.id,
       });
       if (error) throw error;
       setAddedGmailDomains((prev) => new Set(prev).add(newsletter.domain));
       const source = newsletter.rss ? "RSS feed" : "Gmail (reads emails directly)";
       toast({ title: "Added", description: `${newsletter.name} added via ${source}.` });
+      fetchFeeds();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const suggestedSources = [
+    { category: "Substack Blogs", type: "article", items: [
+      { name: "Simon Willison", url: "https://simonwillison.substack.com/feed" },
+      { name: "One Useful Thing (Ethan Mollick)", url: "https://oneusefulthing.substack.com/feed" },
+      { name: "Import AI (Jack Clark)", url: "https://importai.substack.com/feed" },
+      { name: "Semi Analysis", url: "https://semianalysis.com/feed" },
+      { name: "The Batch (Andrew Ng)", url: "https://read.deeplearning.ai/feed" },
+    ]},
+    { category: "ArXiv Papers", type: "article", items: [
+      { name: "ArXiv cs.AI", url: "http://export.arxiv.org/rss/cs.AI" },
+      { name: "ArXiv cs.LG", url: "http://export.arxiv.org/rss/cs.LG" },
+      { name: "ArXiv cs.CL", url: "http://export.arxiv.org/rss/cs.CL" },
+    ]},
+    { category: "Reddit", type: "article", items: [
+      { name: "r/MachineLearning", url: "https://www.reddit.com/r/MachineLearning/.rss" },
+      { name: "r/artificial", url: "https://www.reddit.com/r/artificial/.rss" },
+      { name: "r/LocalLLaMA", url: "https://www.reddit.com/r/LocalLLaMA/.rss" },
+    ]},
+    { category: "Hacker News", type: "article", items: [
+      { name: "HN AI Feed", url: "https://hnrss.org/newest?q=AI+OR+LLM+OR+GPT" },
+    ]},
+    { category: "News RSS", type: "news", items: [
+      { name: "Google News AI", url: "https://news.google.com/rss/topics/CAAqIggKIhxDQkFTRHdvSkwyMHZNRGRqTVhZU0FtVnVLQUFQAQ?hl=en-US&gl=US&ceid=US:en" },
+      { name: "TechCrunch AI", url: "https://techcrunch.com/category/artificial-intelligence/feed/" },
+      { name: "VentureBeat AI", url: "https://venturebeat.com/category/ai/feed/" },
+      { name: "MIT Tech Review AI", url: "https://www.technologyreview.com/topic/artificial-intelligence/feed" },
+      { name: "Ars Technica AI", url: "https://arstechnica.com/ai/feed/" },
+    ]},
+  ];
+
+  const handleAddSuggestion = async (name: string, url: string, type: string) => {
+    if (!user) return;
+    try {
+      const { error } = await supabase.from("feeds").insert({
+        name, url, type, user_id: user.id,
+      });
+      if (error) throw error;
+      setAddedSuggestions((prev) => new Set(prev).add(url));
+      toast({ title: "Added", description: `${name} added.` });
+      fetchFeeds();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const handleDiscoverYouTube = async () => {
+    setDiscoveringYT(true);
+    setYtResults([]);
+    try {
+      const { data, error } = await supabase.functions.invoke("discover-youtube");
+      if (error) throw error;
+      const channels = data?.channels || [];
+      if (channels.length === 0) {
+        toast({ title: "No new channels found", description: "All discovered channels are already in your feeds." });
+      } else {
+        toast({ title: `Found ${channels.length} AI channels`, description: "Review and add them below." });
+      }
+      setYtResults(channels);
+    } catch (e: any) {
+      toast({ title: "Discovery failed", description: e.message || String(e), variant: "destructive" });
+    } finally {
+      setDiscoveringYT(false);
+    }
+  };
+
+  const handleAddYTChannel = async (channel: { name: string; channelId: string }) => {
+    if (!user) return;
+    try {
+      const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channel.channelId}`;
+      const { error } = await supabase.from("feeds").insert({
+        name: channel.name, url: rssUrl, type: "podcast", user_id: user.id,
+      });
+      if (error) throw error;
+      setAddedYTChannels((prev) => new Set(prev).add(channel.channelId));
+      toast({ title: "Added", description: `${channel.name} added as podcast feed.` });
       fetchFeeds();
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
@@ -421,6 +513,90 @@ const Admin = () => {
               </Button>
             </div>
           </form>
+        </section>
+
+        {/* Suggested Sources */}
+        <section className="space-y-4">
+          <h2 className="font-display text-lg text-foreground flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" /> Suggested AI Sources
+          </h2>
+          <p className="text-xs text-muted-foreground">One-click add curated AI content sources — Substack blogs, ArXiv papers, Reddit, Hacker News, and news RSS feeds.</p>
+          <div className="space-y-4">
+            {suggestedSources.map((group) => (
+              <div key={group.category}>
+                <h3 className="text-sm font-medium text-muted-foreground mb-2">{group.category}</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {group.items.map((item) => {
+                    const alreadyAdded = addedSuggestions.has(item.url) || feeds.some((f) => f.url === item.url);
+                    return (
+                      <div key={item.url} className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
+                        <span className="text-sm font-medium">{item.name}</span>
+                        {alreadyAdded ? (
+                          <span className="text-xs text-green-500 flex items-center gap-1"><Check className="h-3 w-3" /> Added</span>
+                        ) : (
+                          <Button size="sm" variant="ghost" onClick={() => handleAddSuggestion(item.name, item.url, group.type)} className="h-7 gap-1">
+                            <Plus className="h-3 w-3" /> Add
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Discover AI YouTube Channels */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-lg text-foreground">Discover AI YouTube Channels</h2>
+            <Button variant="outline" size="sm" onClick={handleDiscoverYouTube} disabled={discoveringYT} className="gap-1.5">
+              {discoveringYT ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+              {discoveringYT ? "Searching…" : "Discover"}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Search YouTube for AI channels using the YouTube Data API. Add channels to your podcast feeds with one click.
+          </p>
+          {ytResults.length > 0 && (
+            <div className="rounded-lg border border-border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Channel</TableHead>
+                    <TableHead className="hidden sm:table-cell">Subscribers</TableHead>
+                    <TableHead className="w-16"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {ytResults.map((ch) => (
+                    <TableRow key={ch.channelId}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {ch.thumbnail && <img src={ch.thumbnail} alt="" className="h-8 w-8 rounded-full" />}
+                          <div>
+                            <span className="font-medium">{ch.name}</span>
+                            <span className="block text-xs text-muted-foreground truncate max-w-[250px]">{ch.description}</span>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">{ch.subscriberCount}</TableCell>
+                      <TableCell>
+                        {!addedYTChannels.has(ch.channelId) ? (
+                          <Button size="sm" variant="ghost" onClick={() => handleAddYTChannel(ch)} className="h-7 gap-1">
+                            <Plus className="h-3 w-3" /> Add
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-green-500 flex items-center gap-1"><Check className="h-3 w-3" /> Added</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </section>
 
         {/* Scan Gmail */}

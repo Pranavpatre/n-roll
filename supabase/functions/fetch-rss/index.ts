@@ -90,12 +90,11 @@ serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
-    const userId = claimsData.claims.sub;
+    const userId = user.id;
 
     const { data: feeds, error: feedsError } = await supabase
       .from("feeds")
@@ -135,14 +134,16 @@ serve(async (req) => {
         const xml = await res.text();
         const items = extractItems(xml);
 
+        const skipAIFilter = feed.url.includes("arxiv.org") || feed.url.includes("hnrss.org");
         let added = 0;
         for (const item of items) {
-          if (added >= 10) break;
+          if (added >= 30) break;
+          if (!item.link || item.link.length < 10) continue;
           if (existingUrls.has(item.link)) continue;
           const pubDate = item.pubDate ? new Date(item.pubDate) : new Date();
           if (pubDate < cutoff) continue;
 
-          if (!isAIRelated(item.title, item.description)) {
+          if (!skipAIFilter && !isAIRelated(item.title, item.description)) {
             console.log(`Skipped (not AI-related): ${item.title}`);
             continue;
           }

@@ -1,7 +1,7 @@
-import { Mic, FileText, Newspaper, ExternalLink, ChevronDown } from "lucide-react";
+import { Mic, FileText, Newspaper, BookOpen, ExternalLink, ChevronDown } from "lucide-react";
 
 interface DigestCardProps {
-  type: "podcast" | "newsletter" | "news";
+  type: "podcast" | "newsletter" | "news" | "article";
   title: string;
   source: string;
   guest?: string;
@@ -17,6 +17,7 @@ const typeMeta = {
   podcast: { icon: Mic, label: "Podcast", className: "bg-podcast/15 text-podcast border-podcast/20" },
   newsletter: { icon: FileText, label: "Newsletter", className: "bg-newsletter/15 text-newsletter border-newsletter/20" },
   news: { icon: Newspaper, label: "News", className: "bg-news/15 text-news border-news/20" },
+  article: { icon: BookOpen, label: "Article", className: "bg-purple-500/15 text-purple-400 border-purple-500/20" },
 };
 
 const DigestCard = ({
@@ -101,7 +102,7 @@ const DigestCard = ({
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
         >
-          {type === "podcast" ? "Listen to episode" : type === "newsletter" ? "Read newsletter" : "Read full article"}{" "}<ExternalLink className="h-3.5 w-3.5" />
+          {type === "podcast" ? "Listen to episode" : type === "article" ? "Read article" : type === "newsletter" ? "Read newsletter" : "Read full article"}{" "}<ExternalLink className="h-3.5 w-3.5" />
         </a>
         <div className="flex items-center gap-1 text-xs text-muted-foreground animate-bounce">
           <ChevronDown className="h-4 w-4" />

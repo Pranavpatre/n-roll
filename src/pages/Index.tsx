@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 interface DigestItem {
   id?: string;
-  type: "podcast" | "newsletter" | "news";
+  type: "podcast" | "newsletter" | "news" | "article";
   title: string;
   source: string;
   guest?: string;
@@ -22,7 +22,7 @@ interface DigestItem {
   quote?: string;
 }
 
-type FilterType = "all" | "news" | "podcast" | "newsletter";
+type FilterType = "all" | "news" | "podcast" | "article";
 
 const REFRESH_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes
 
@@ -47,7 +47,7 @@ const Index = () => {
       .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(200);
     if (error) {
       console.error("Error fetching digests:", error);
       return;
@@ -104,11 +104,13 @@ const Index = () => {
       const items = rssData?.items || [];
       if (items.length > 0) {
         let successCount = 0;
-        for (const item of items) {
-          try {
-            const { error } = await supabase.functions.invoke("summarize", { body: { item } });
-            if (!error) successCount++;
-          } catch {}
+        const BATCH_SIZE = 5;
+        for (let i = 0; i < items.length; i += BATCH_SIZE) {
+          const batch = items.slice(i, i + BATCH_SIZE);
+          const results = await Promise.allSettled(
+            batch.map((item: any) => supabase.functions.invoke("summarize", { body: { item } }))
+          );
+          successCount += results.filter((r) => r.status === "fulfilled" && !(r as PromiseFulfilledResult<any>).value.error).length;
         }
         if (successCount > 0) {
           toast({ title: "New digests!", description: `${successCount} new summaries added.` });
@@ -151,7 +153,7 @@ const Index = () => {
     { value: "all", label: "All" },
     { value: "news", label: "News" },
     { value: "podcast", label: "Podcasts" },
-    { value: "newsletter", label: "Newsletters" },
+    { value: "article", label: "Articles" },
   ];
 
   return (
