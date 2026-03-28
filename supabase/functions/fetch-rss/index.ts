@@ -71,6 +71,28 @@ function extractItems(xml: string) {
   return items;
 }
 
+// Normalize a title for similarity comparison: lowercase, strip punctuation, extra spaces
+function normalizeTitle(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+}
+
+// Check if a title is too similar to any seen title (word overlap > 60%)
+function isTitleDuplicate(normalized: string, seenTitles: string[]): boolean {
+  const words = new Set(normalized.split(" ").filter((w) => w.length > 2));
+  if (words.size < 3) return false;
+  for (const seen of seenTitles) {
+    const seenWords = new Set(seen.split(" ").filter((w) => w.length > 2));
+    if (seenWords.size < 3) continue;
+    let overlap = 0;
+    for (const w of words) {
+      if (seenWords.has(w)) overlap++;
+    }
+    const similarity = overlap / Math.min(words.size, seenWords.size);
+    if (similarity > 0.6) return true;
+  }
+  return false;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -111,13 +133,15 @@ serve(async (req) => {
 
     const { data: existingDigests } = await supabase
       .from("digests")
-      .select("url")
+      .select("url, title")
       .eq("user_id", userId);
     const existingUrls = new Set((existingDigests || []).map((d: any) => d.url));
+    const existingTitles = (existingDigests || []).map((d: any) => normalizeTitle(d.title));
 
     // 1-month lookback window
     const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const allItems: any[] = [];
+    const seenTitles: string[] = [...existingTitles];
 
     // Separate feeds by source type
     const rssFeeds = feeds.filter((f: any) => !f.url.startsWith("gmail:"));
@@ -147,6 +171,14 @@ serve(async (req) => {
             console.log(`Skipped (not AI-related): ${item.title}`);
             continue;
           }
+
+          // Title similarity dedup — skip stories covering the same topic
+          const normalized = normalizeTitle(item.title);
+          if (isTitleDuplicate(normalized, seenTitles)) {
+            console.log(`Skipped (duplicate topic): ${item.title}`);
+            continue;
+          }
+          seenTitles.push(normalized);
 
           allItems.push({
             feedId: feed.id,
