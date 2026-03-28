@@ -175,8 +175,8 @@ serve(async (req) => {
     const existingUrls = new Set((existingDigests || []).map((d: any) => d.url));
     const existingTitles = (existingDigests || []).map((d: any) => normalizeTitle(d.title));
 
-    // 1-month lookback window
-    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    // 7-day lookback window
+    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const allItems: any[] = [];
     const seenTitles: string[] = [...existingTitles];
 
@@ -198,7 +198,7 @@ serve(async (req) => {
         const skipAIFilter = feed.url.includes("arxiv.org") || feed.url.includes("hnrss.org");
         let added = 0;
         for (const item of items) {
-          if (added >= 30) break;
+          if (added >= 8) break;
           if (!item.link || item.link.length < 10) continue;
           if (existingUrls.has(item.link)) continue;
           const pubDate = item.pubDate ? new Date(item.pubDate) : new Date();
