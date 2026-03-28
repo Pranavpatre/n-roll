@@ -378,6 +378,15 @@ const Admin = () => {
     { category: "Hacker News", type: "article", items: [
       { name: "HN AI Feed", url: "https://hnrss.org/newest?q=AI+OR+LLM+OR+GPT" },
     ]},
+    { category: "YouTube Podcasts", type: "podcast", items: [
+      { name: "20VC with Harry Stebbings", url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCf0PBRjhf0rF8fWBIxTuoWA" },
+      { name: "Varun Mayya", url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCsQoiOrh7jzKmE8NBofhTnQ" },
+      { name: "Diary of a CEO", url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCnjgxChqYYnyoqO4k_Q1d6Q" },
+      { name: "All-In Podcast", url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCESLZhusAkFfsNsApnjF_Cg" },
+      { name: "No Priors", url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCSI7h9hydQ40K5MJHnCrQvw" },
+      { name: "The AI Daily Brief", url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCKelCK4ZaO6HeEI1KQjqzWA" },
+      { name: "Lenny's Podcast", url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC6t1O76G0jYXOAoYCm153dA" },
+    ]},
     { category: "News RSS", type: "news", items: [
       { name: "Google News AI", url: "https://news.google.com/rss/topics/CAAqIggKIhxDQkFTRHdvSkwyMHZNRGRqTVhZU0FtVnVLQUFQAQ?hl=en-US&gl=US&ceid=US:en" },
       { name: "TechCrunch AI", url: "https://techcrunch.com/category/artificial-intelligence/feed/" },

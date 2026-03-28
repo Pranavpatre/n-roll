@@ -157,22 +157,22 @@ const Index = () => {
   ];
 
   return (
-    <div className="h-screen flex flex-col bg-background overflow-hidden">
+    <div className="flex flex-col bg-background overflow-hidden" style={{ height: "100dvh" }}>
       {/* Compact header */}
       <header className="border-b border-border bg-surface-elevated flex-shrink-0 z-10">
-        <div className="px-4 py-3 flex items-center justify-between">
+        <div className="px-3 py-2.5 sm:px-4 sm:py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Zap className="h-5 w-5 text-primary" />
             <span className="font-display text-lg text-foreground">AI Buzz</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            {/* Filter pills */}
-            <div className="hidden sm:flex items-center gap-1 mr-2">
+          <div className="flex items-center gap-1">
+            {/* Filter pills — always visible */}
+            <div className="flex items-center gap-1 mr-1">
               {filters.map((f) => (
                 <button
                   key={f.value}
                   onClick={() => setFilter(f.value)}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                  className={`rounded-full px-2.5 py-1 text-[11px] sm:text-xs font-medium transition-colors ${
                     filter === f.value
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted text-muted-foreground hover:text-foreground"
@@ -182,32 +182,16 @@ const Index = () => {
                 </button>
               ))}
             </div>
-            {/* Mobile filter */}
-            <div className="sm:hidden relative">
-              <select
-                value={filter}
-                onChange={(e) => setFilter(e.target.value as FilterType)}
-                className="appearance-none bg-muted text-foreground text-xs rounded-full px-3 py-1.5 pr-6 border-0 focus:ring-1 focus:ring-primary"
-              >
-                {filters.map((f) => (
-                  <option key={f.value} value={f.value}>{f.label}</option>
-                ))}
-              </select>
-              <Filter className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
-            </div>
 
             {syncing && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground mr-1">
-                <RefreshCw className="h-3 w-3 animate-spin" />
-                <span className="hidden sm:inline">Syncing…</span>
-              </div>
+              <RefreshCw className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
             )}
             {isAdmin && (
-              <Button variant="ghost" size="icon" onClick={() => navigate("/admin")} title="Admin">
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/admin")} title="Admin">
                 <Shield className="h-4 w-4" />
               </Button>
             )}
-            <Button variant="ghost" size="icon" onClick={signOut} title="Sign out">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={signOut} title="Sign out">
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
@@ -217,11 +201,11 @@ const Index = () => {
       {/* Snap-scroll container */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto snap-y snap-mandatory"
-        style={{ scrollSnapType: "y mandatory" }}
+        className="flex-1 overflow-y-auto overscroll-y-contain"
+        style={{ scrollSnapType: "y mandatory", WebkitOverflowScrolling: "touch" }}
       >
         {loading && (
-          <div className="h-full snap-start flex items-center justify-center">
+          <div className="snap-start flex items-center justify-center" style={{ height: "calc(100dvh - 90px)" }}>
             <div className="text-center space-y-3">
               <Zap className="h-8 w-8 text-primary mx-auto animate-pulse" />
               <p className="text-muted-foreground text-sm">Loading your digest…</p>
@@ -230,7 +214,7 @@ const Index = () => {
         )}
 
         {!loading && filtered.length === 0 && (
-          <div className="h-full snap-start flex items-center justify-center">
+          <div className="snap-start flex items-center justify-center" style={{ height: "calc(100dvh - 90px)" }}>
             <div className="text-center space-y-3 px-6">
               <Zap className="h-8 w-8 text-muted-foreground mx-auto" />
               <h3 className="font-display text-xl text-foreground">No digests yet</h3>
@@ -244,17 +228,17 @@ const Index = () => {
         {filtered.map((d, i) => (
           <div
             key={d.id || `${d.source}-${i}`}
-            className="h-full snap-start snap-always"
-            style={{ minHeight: "calc(100vh - 52px)" }}
+            className="snap-start snap-always"
+            style={{ height: "calc(100dvh - 90px)" }}
           >
             <DigestCard {...d} />
           </div>
         ))}
 
         {filtered.length > 0 && (
-          <div className="h-full snap-start flex items-center justify-center">
+          <div className="snap-start flex items-center justify-center" style={{ height: "calc(100dvh - 90px)" }}>
             <div className="text-center space-y-2 px-6">
-              <p className="font-display text-2xl text-foreground">You're all caught up! ✅</p>
+              <p className="font-display text-2xl text-foreground">You're all caught up!</p>
               <p className="text-sm text-muted-foreground">
                 {digests.length} articles summarized
               </p>
@@ -265,7 +249,7 @@ const Index = () => {
 
       {/* Progress indicator */}
       {filtered.length > 0 && (
-        <div className="flex-shrink-0 bg-surface-elevated border-t border-border px-4 py-2 flex items-center justify-between">
+        <div className="flex-shrink-0 bg-surface-elevated border-t border-border px-4 py-1.5 flex items-center justify-between safe-area-bottom">
           <span className="text-xs text-muted-foreground">
             {Math.min(currentIndex + 1, filtered.length)} / {filtered.length}
           </span>

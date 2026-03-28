@@ -6,33 +6,58 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const AI_KEYWORDS = [
+// Strong signals — these are unambiguous AI terms, safe for title-only matching
+const AI_KEYWORDS_STRONG = [
+  // Core concepts
   "artificial intelligence", "machine learning", "deep learning", "neural network",
   "large language model", "llm", "generative ai", "gen ai", "genai",
-  "gpt", "chatgpt", "openai", "claude", "anthropic", "gemini", "mistral", "llama",
-  "midjourney", "stable diffusion", "dall-e", "dalle", "sora", "copilot",
-  "perplexity", "cursor", "devin", "lovable", "windsurf", "replit", "v0",
-  "transformer", "diffusion model", "fine-tuning", "fine tuning", "finetuning",
-  "prompt engineering", "rag ", "retrieval augmented", "vector database",
-  "embedding", "tokenizer", "inference", "training data",
-  "reinforcement learning", "rlhf", "chain of thought", "cot",
-  "multimodal", "multi-modal", "vision model", "text-to-image", "text-to-video",
-  "text-to-speech", "speech-to-text", "text to image", "text to video",
-  "ai agent", "ai agents", "agentic", "autonomous agent", "ai assistant",
-  "ai tool", "ai tools", "ai app", "ai startup", "ai company",
-  "ai safety", "ai alignment", "ai ethics", "ai regulation", "ai policy",
-  "ai chip", "ai hardware", "nvidia", "tpu",
+  // Frontier models & products
+  "chatgpt", "gpt-4", "gpt-5", "gpt4", "gpt5", "gpt-4o", "gpt-o1", "gpt-o3",
+  "claude 3", "claude 4", "claude sonnet", "claude opus", "claude haiku",
+  "gemini 2", "gemini 3", "gemini pro", "gemini ultra",
+  "deepseek", "qwen", "phi-4", "llama 3", "llama 4",
+  "grok", "grok-2", "grok-3",
+  // Companies (unambiguous)
+  "openai", "anthropic", "deepmind", "google deepmind",
+  "mistral ai", "cohere", "inflection ai", "character ai",
+  "stability ai", "xai", "groq",
+  // AI products & tools
+  "chatgpt", "copilot github", "github copilot",
+  "midjourney", "stable diffusion", "dall-e", "dalle",
+  "sora", "runway gen", "pika labs", "kling ai", "luma ai", "flux ai",
+  "ideogram", "suno ai", "udio",
+  "perplexity ai", "cursor ai", "windsurf ai", "devin ai", "replit ai",
+  "elevenlabs", "eleven labs",
+  "hugging face", "huggingface",
+  "notion ai", "adobe firefly",
+  // Technical
+  "transformer", "diffusion model", "fine-tuning", "fine tuning",
+  "prompt engineering", "retrieval augmented", "vector database",
+  "reinforcement learning", "rlhf", "chain of thought",
+  "multimodal", "multi-modal", "text-to-image", "text-to-video",
+  "text-to-speech", "speech-to-text",
+  "ai agent", "ai agents", "agentic",
+  "ai safety", "ai alignment", "ai ethics", "ai regulation",
+  "ai chip", "ai hardware", "tpu", "nvidia ai",
   "foundation model", "frontier model", "open source ai", "open-source ai",
-  "ai research", "ai paper", "ai benchmark", "ai model",
-  "natural language processing", "nlp", "computer vision",
+  "natural language processing", "computer vision",
+  "model context protocol", "mcp server",
+  // AI in context
+  "ai tool", "ai tools", "ai app", "ai startup", "ai company",
+  "ai model", "ai research", "ai benchmark", "ai assistant",
+  "ai video", "ai image", "ai music", "ai code", "ai coding",
+  "ai search", "ai chatbot", "ai bot",
+];
+
+// Weak signals — only match when combined with description context (not title-only)
+const AI_KEYWORDS_WEAK = [
+  "gpt", "claude", "gemini", "mistral", "llama", "copilot",
+  "nvidia", "meta ai", "google ai", "microsoft ai", "amazon ai", "apple ai",
+  "embedding", "tokenizer", "inference", "training data",
   "robotics", "humanoid", "autonomous driving", "self-driving",
-  "dispatch", "artifacts", "projects", "computer use", "model context protocol", "mcp",
-  "o1", "o3", "o4", "gpt-4", "gpt-5", "gpt4", "gpt5",
-  "claude 3", "claude 4", "sonnet", "opus", "haiku",
-  "gemini 2", "gemini 3", "flash", "deepseek", "qwen", "phi-4",
-  "hugging face", "huggingface", "runway", "pika", "kling",
-  "meta ai", "google ai", "microsoft ai", "amazon ai", "apple ai",
-  "cohere", "databricks", "snowflake cortex", "groq",
+  "databricks", "snowflake cortex",
+  "runway", "pika", "kling",
+  "nlp", "vision model",
 ];
 
 const ACTION_KEYWORDS = [
@@ -48,12 +73,22 @@ const AI_CONTEXT_WORDS = [
 ];
 
 function isAIRelated(title: string, description: string, titleOnly = false): boolean {
-  // For podcasts/YouTube, only check title — descriptions contain sponsor links
+  const titleLower = title.toLowerCase();
+  const fullText = `${title} ${description}`.toLowerCase();
+
+  // Strong keywords are unambiguous — safe to match in title alone
+  if (AI_KEYWORDS_STRONG.some((kw) => titleLower.includes(kw))) return true;
+
+  // For podcasts/YouTube, stop here — descriptions contain sponsor links
   // that falsely match AI keywords (e.g., Perplexity ads in every Lex Fridman video)
-  const text = titleOnly ? title.toLowerCase() : `${title} ${description}`.toLowerCase();
-  if (AI_KEYWORDS.some((kw) => text.includes(kw))) return true;
-  const hasAction = ACTION_KEYWORDS.some((kw) => text.includes(kw));
-  const hasAIContext = AI_CONTEXT_WORDS.some((kw) => text.includes(kw));
+  if (titleOnly) return false;
+
+  // Weak keywords need description context to confirm AI relevance
+  if (AI_KEYWORDS_WEAK.some((kw) => fullText.includes(kw))) return true;
+
+  // Action + AI context combo (e.g., "launching" + "model")
+  const hasAction = ACTION_KEYWORDS.some((kw) => fullText.includes(kw));
+  const hasAIContext = AI_CONTEXT_WORDS.some((kw) => fullText.includes(kw));
   return hasAction && hasAIContext;
 }
 

@@ -67,7 +67,7 @@ const Auth = () => {
   if (loading) return null;
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
+    <div className="bg-background flex items-center justify-center px-4" style={{ minHeight: "100dvh" }}>
       <div className="w-full max-w-sm space-y-8">
         {/* Logo */}
         <div className="text-center space-y-2">
