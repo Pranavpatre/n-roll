@@ -47,8 +47,10 @@ const AI_CONTEXT_WORDS = [
   "agent", "copilot", "chatbot", "diffusion",
 ];
 
-function isAIRelated(title: string, description: string): boolean {
-  const text = `${title} ${description}`.toLowerCase();
+function isAIRelated(title: string, description: string, titleOnly = false): boolean {
+  // For podcasts/YouTube, only check title — descriptions contain sponsor links
+  // that falsely match AI keywords (e.g., Perplexity ads in every Lex Fridman video)
+  const text = titleOnly ? title.toLowerCase() : `${title} ${description}`.toLowerCase();
   if (AI_KEYWORDS.some((kw) => text.includes(kw))) return true;
   const hasAction = ACTION_KEYWORDS.some((kw) => text.includes(kw));
   const hasAIContext = AI_CONTEXT_WORDS.some((kw) => text.includes(kw));
@@ -167,7 +169,8 @@ serve(async (req) => {
           const pubDate = item.pubDate ? new Date(item.pubDate) : new Date();
           if (pubDate < cutoff) continue;
 
-          if (!skipAIFilter && !isAIRelated(item.title, item.description)) {
+          const titleOnly = feed.type === "podcast";
+          if (!skipAIFilter && !isAIRelated(item.title, item.description, titleOnly)) {
             console.log(`Skipped (not AI-related): ${item.title}`);
             continue;
           }
