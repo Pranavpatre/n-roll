@@ -74,9 +74,9 @@ const Auth = () => {
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 mx-auto">
             <Zap className="h-6 w-6 text-primary" />
           </div>
-          <h1 className="font-display text-3xl text-foreground">Daily Digest</h1>
+          <h1 className="font-display text-3xl text-foreground">AI Buzz</h1>
           <p className="text-sm text-muted-foreground">
-            Your daily AI digest — news, tools, podcasts & newsletters
+            Daily AI briefs — everything happening in AI, one scroll away
           </p>
         </div>
 

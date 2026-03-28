@@ -127,7 +127,7 @@ serve(async (req) => {
     for (const feed of rssFeeds) {
       try {
         const res = await fetch(feed.url, {
-          headers: { "User-Agent": "DailyDigest/1.0" },
+          headers: { "User-Agent": "AIBuzz/1.0" },
           signal: AbortSignal.timeout(10000),
         });
         if (!res.ok) continue;

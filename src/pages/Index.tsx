@@ -163,7 +163,7 @@ const Index = () => {
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Zap className="h-5 w-5 text-primary" />
-            <span className="font-display text-lg text-foreground">Daily Digest</span>
+            <span className="font-display text-lg text-foreground">AI Buzz</span>
           </div>
           <div className="flex items-center gap-1.5">
             {/* Filter pills */}
