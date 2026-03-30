@@ -195,7 +195,12 @@ serve(async (req) => {
         const xml = await res.text();
         const items = extractItems(xml);
 
-        const skipAIFilter = feed.url.includes("arxiv.org") || feed.url.includes("hnrss.org");
+        const skipAIFilter = feed.url.includes("arxiv.org") || feed.url.includes("hnrss.org")
+          || feed.url.includes("techcrunch.com/category/artificial-intelligence")
+          || feed.url.includes("venturebeat.com/category/ai")
+          || feed.url.includes("technologyreview.com/topic/artificial-intelligence")
+          || feed.url.includes("arstechnica.com/ai")
+          || feed.name?.toLowerCase().includes("ai");
         let added = 0;
         for (const item of items) {
           if (added >= 30) break;

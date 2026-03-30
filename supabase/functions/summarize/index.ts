@@ -106,9 +106,18 @@ Return ONLY valid JSON:
       summary.topic = item.title.replace(/^RT @\w+:\s*/, "").slice(0, 80);
     }
 
-    // Save digest to DB
+    // Save digest to DB — use article's publish date, not summarization time
+    const pubDate = item.pubDate ? new Date(item.pubDate) : new Date();
     const now = new Date();
-    const dateStr = `Today, ${now.getHours()}:${String(now.getMinutes()).padStart(2, "0")}`;
+    const diffMs = now.getTime() - pubDate.getTime();
+    const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    let dateStr: string;
+    if (diffHrs < 1) dateStr = "Just now";
+    else if (diffHrs < 24) dateStr = `${diffHrs}h ago`;
+    else if (diffDays === 1) dateStr = "Yesterday";
+    else if (diffDays < 7) dateStr = `${diffDays}d ago`;
+    else dateStr = pubDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
     const { data: digest, error: digestError } = await supabase
       .from("digests")
