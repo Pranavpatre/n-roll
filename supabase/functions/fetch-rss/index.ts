@@ -168,13 +168,17 @@ serve(async (req) => {
       });
     }
 
-    const [{ data: existingDigests }, { data: feedScores }] = await Promise.all([
-      supabase.from("digests").select("url, title").eq("user_id", userId),
-      supabase.from("feed_scores").select("feed_id, upvotes, downvotes").eq("user_id", userId),
-    ]);
+    const { data: existingDigests } = await supabase
+      .from("digests").select("url, title").eq("user_id", userId);
     const existingUrls = new Set((existingDigests || []).map((d: any) => d.url));
     const existingTitles = (existingDigests || []).map((d: any) => normalizeTitle(d.title));
-    const scoreMap = new Map((feedScores || []).map((s: any) => [s.feed_id, s]));
+
+    // feed_scores may not exist pre-migration — query gracefully
+    const feedScoresRes = await supabase
+      .from("feed_scores").select("feed_id, upvotes, downvotes").eq("user_id", userId);
+    const scoreMap = new Map(
+      (feedScoresRes.data || []).map((s: any) => [s.feed_id, s])
+    );
 
     // 1-month lookback window
     const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);

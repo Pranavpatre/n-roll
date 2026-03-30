@@ -81,10 +81,12 @@ const Index = () => {
     }
 
     const digestIds = digestData.map((d: any) => d.id);
-    const [{ data: pointsData }, { data: votesData }] = await Promise.all([
-      supabase.from("digest_points").select("*").in("digest_id", digestIds).order("sort_order", { ascending: true }),
-      supabase.from("votes").select("digest_id, vote").eq("user_id", user.id),
-    ]);
+    const { data: pointsData } = await supabase
+      .from("digest_points").select("*").in("digest_id", digestIds).order("sort_order", { ascending: true });
+
+    // votes table may not exist yet (pre-migration) — query gracefully
+    const votesRes = await supabase.from("votes").select("digest_id, vote").eq("user_id", user.id);
+    const votesData = votesRes.error ? [] : (votesRes.data || []);
 
     const pointsByDigest: Record<string, { heading: string; detail: string }[]> = {};
     (pointsData || []).forEach((p: any) => {
@@ -156,11 +158,12 @@ const Index = () => {
     fetchDigests().then(() => autoSync());
   }, [fetchDigests, autoSync]);
 
-  // Load email preferences
+  // Load email preferences (table may not exist pre-migration)
   useEffect(() => {
     if (!user) return;
     supabase.from("email_preferences").select("weekly_digest").eq("user_id", user.id).single()
-      .then(({ data }) => { if (data) setWeeklyDigest(data.weekly_digest); });
+      .then(({ data }) => { if (data) setWeeklyDigest(data.weekly_digest); })
+      .catch(() => { /* table doesn't exist yet */ });
   }, [user]);
 
   const handleVote = useCallback(async (digestId: string, vote: 1 | -1) => {
