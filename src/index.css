@@ -113,14 +113,11 @@
 
   html, body, #root {
     height: 100%;
-    overflow: hidden;
   }
 
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-body);
-    /* Use dvh where supported for mobile Safari */
-    height: 100dvh;
   }
 
   h1, h2, h3 {
