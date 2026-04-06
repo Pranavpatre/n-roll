@@ -108,24 +108,43 @@ function extractItems(xml: string) {
   return items;
 }
 
-// Normalize a title for similarity comparison: lowercase, strip punctuation, extra spaces
+const STOPWORDS = new Set([
+  "the", "and", "for", "its", "has", "was", "are", "with", "that", "this",
+  "his", "her", "but", "not", "from", "amid", "into", "over", "says", "said",
+  "calls", "amid", "amid", "after", "will", "what", "how", "why", "who",
+  "new", "top", "big", "all", "can", "just", "now", "out", "one", "two",
+]);
+
+// Normalize a title for similarity comparison: lowercase, split letter/digit
+// boundaries (dlss5 → dlss 5), strip punctuation, filter stopwords
 function normalizeTitle(title: string): string {
-  return title.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+  return title
+    .toLowerCase()
+    // split letter-digit and digit-letter boundaries: dlss5 → dlss 5, gpt4 → gpt 4
+    .replace(/([a-z])(\d)/g, "$1 $2")
+    .replace(/(\d)([a-z])/g, "$1 $2")
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-// Check if a title is too similar to any seen title (word overlap > 60%)
+// Check if a title is too similar to any seen title (meaningful word overlap > 50%)
 function isTitleDuplicate(normalized: string, seenTitles: string[]): boolean {
-  const words = new Set(normalized.split(" ").filter((w) => w.length > 2));
+  const words = new Set(
+    normalized.split(" ").filter((w) => w.length > 2 && !STOPWORDS.has(w))
+  );
   if (words.size < 3) return false;
   for (const seen of seenTitles) {
-    const seenWords = new Set(seen.split(" ").filter((w) => w.length > 2));
+    const seenWords = new Set(
+      seen.split(" ").filter((w) => w.length > 2 && !STOPWORDS.has(w))
+    );
     if (seenWords.size < 3) continue;
     let overlap = 0;
     for (const w of words) {
       if (seenWords.has(w)) overlap++;
     }
     const similarity = overlap / Math.min(words.size, seenWords.size);
-    if (similarity > 0.6) return true;
+    if (similarity > 0.5) return true;
   }
   return false;
 }
@@ -133,27 +152,42 @@ function isTitleDuplicate(normalized: string, seenTitles: string[]): boolean {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  // Parse body early for providerToken
+  // Parse body early for providerToken / cron userId
   let requestBody: any = {};
   try { requestBody = await req.json(); } catch {}
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
-    }
+    const cronSecret = req.headers.get("X-Cron-Secret");
+    const isCron = cronSecret !== null && cronSecret === Deno.env.get("CRON_SECRET");
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    let supabase: ReturnType<typeof createClient>;
+    let userId: string;
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+    if (isCron) {
+      userId = requestBody?.userId;
+      if (!userId) {
+        return new Response(JSON.stringify({ error: "userId required for cron" }), { status: 400, headers: corsHeaders });
+      }
+      supabase = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      );
+    } else {
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader?.startsWith("Bearer ")) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+      }
+      supabase = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+      }
+      userId = user.id;
     }
-    const userId = user.id;
 
     const { data: feeds, error: feedsError } = await supabase
       .from("feeds")

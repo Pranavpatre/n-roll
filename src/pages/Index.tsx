@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Zap, LogOut, Shield, RefreshCw, Settings, Mail } from "lucide-react";
+import { Zap, LogOut, Shield, Settings, Mail } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import DigestCard from "@/components/DigestCard";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ interface DigestItem {
   author?: string;
   url: string;
   date: string;
+  created_at: string;
   points: { heading: string; detail: string }[];
   quote?: string;
   voteScore: number;
@@ -26,33 +27,16 @@ interface DigestItem {
 
 type FilterType = "all" | "news" | "podcast" | "article";
 
-const REFRESH_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes
-
-// Seeded shuffle — stable within same day
-function seededShuffle<T>(arr: T[]): T[] {
-  const seed = new Date().toDateString();
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = ((h << 5) - h + seed.charCodeAt(i)) | 0;
-  const result = [...arr];
-  for (let i = result.length - 1; i > 0; i--) {
-    h = Math.abs((h * 16807) % 2147483647);
-    const j = h % (i + 1);
-    [result[i], result[j]] = [result[j], result[i]];
-  }
-  return result;
-}
-
+// Sort newest first
 function sortDigests(items: DigestItem[]): DigestItem[] {
-  const upvoted = items.filter((d) => d.voteScore > 0).sort((a, b) => b.voteScore - a.voteScore);
-  const neutral = seededShuffle(items.filter((d) => d.voteScore === 0));
-  const downvoted = items.filter((d) => d.voteScore < 0).sort((a, b) => a.voteScore - b.voteScore);
-  return [...upvoted, ...neutral, ...downvoted];
+  return [...items].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
 }
 
 const Index = () => {
   const [digests, setDigests] = useState<DigestItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
   const [filter, setFilter] = useState<FilterType>("all");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
@@ -70,6 +54,7 @@ const Index = () => {
         .from("digests")
         .select("*")
         .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
         .limit(200);
       if (error) {
         console.error("Error fetching digests:", error);
@@ -111,6 +96,7 @@ const Index = () => {
         author: d.author || undefined,
         url: d.url,
         date: d.date,
+        created_at: d.created_at,
         points: pointsByDigest[d.id] || [],
         quote: d.quote || undefined,
         voteScore: d.vote_score ?? 0,
@@ -126,45 +112,9 @@ const Index = () => {
     }
   }, [user]);
 
-  // Auto-sync: fetch new feed items + summarize on page load (with cooldown)
-  const autoSync = useCallback(async () => {
-    if (!user) return;
-    const cacheKey = `digest_last_sync_${user.id}`;
-    const lastSync = localStorage.getItem(cacheKey);
-    if (lastSync && Date.now() - Number(lastSync) < REFRESH_COOLDOWN_MS) return;
-
-    setSyncing(true);
-    try {
-      const { data: rssData, error: rssError } = await supabase.functions.invoke("fetch-rss");
-      if (rssError) throw rssError;
-
-      const items = rssData?.items || [];
-      if (items.length > 0) {
-        let successCount = 0;
-        const BATCH_SIZE = 5;
-        for (let i = 0; i < items.length; i += BATCH_SIZE) {
-          const batch = items.slice(i, i + BATCH_SIZE);
-          const results = await Promise.allSettled(
-            batch.map((item: any) => supabase.functions.invoke("summarize", { body: { item } }))
-          );
-          successCount += results.filter((r) => r.status === "fulfilled" && !(r as PromiseFulfilledResult<any>).value.error).length;
-        }
-        if (successCount > 0) {
-          toast({ title: "New digests!", description: `${successCount} new summaries added.` });
-          await fetchDigests();
-        }
-      }
-      localStorage.setItem(cacheKey, String(Date.now()));
-    } catch (e) {
-      console.error("Auto-sync failed:", e);
-    } finally {
-      setSyncing(false);
-    }
-  }, [user, fetchDigests, toast]);
-
   useEffect(() => {
-    fetchDigests().then(() => autoSync());
-  }, [fetchDigests, autoSync]);
+    fetchDigests();
+  }, [fetchDigests]);
 
   // Load email preferences (table may not exist pre-migration)
   useEffect(() => {
@@ -252,9 +202,6 @@ const Index = () => {
               ))}
             </div>
 
-            {syncing && (
-              <RefreshCw className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-            )}
             {isAdmin && (
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/admin")} title="Admin">
                 <Shield className="h-4 w-4" />

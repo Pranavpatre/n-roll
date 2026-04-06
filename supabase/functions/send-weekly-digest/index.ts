@@ -16,7 +16,7 @@ serve(async (req) => {
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const { data: topDigests, error: digestError } = await supabase
       .from("digests")
-      .select("title, source, url, type, vote_score, quote")
+      .select("id, title, source, url, type, vote_score, quote")
       .gte("created_at", weekAgo)
       .gt("vote_score", 0)
       .order("vote_score", { ascending: false })
@@ -27,6 +27,21 @@ serve(async (req) => {
       return new Response(JSON.stringify({ sent: 0, reason: "no_upvoted_content" }), {
         headers: { "Content-Type": "application/json" },
       });
+    }
+
+    // Fetch bullet points for each digest
+    const digestIds = topDigests.map((d: any) => d.id);
+    const { data: points } = await supabase
+      .from("digest_points")
+      .select("digest_id, heading, detail, sort_order")
+      .in("digest_id", digestIds)
+      .order("sort_order", { ascending: true });
+
+    const pointsByDigest = new Map<string, any[]>();
+    for (const p of (points || [])) {
+      const arr = pointsByDigest.get(p.digest_id) || [];
+      arr.push(p);
+      pointsByDigest.set(p.digest_id, arr);
     }
 
     // Get users who opted in to weekly digest
@@ -58,7 +73,14 @@ serve(async (req) => {
     }
 
     // Build email HTML
-    const articlesHtml = topDigests.map((d: any, i: number) => `
+    const articlesHtml = topDigests.map((d: any, i: number) => {
+      const dPoints = pointsByDigest.get(d.id) || [];
+      const pointsHtml = dPoints.length > 0
+        ? `<ul style="margin: 10px 0 0; padding-left: 18px; color: #444; font-size: 14px; line-height: 1.6;">
+            ${dPoints.map((p: any) => `<li style="margin-bottom: 6px;"><strong>${p.heading}</strong>: ${p.detail}</li>`).join("")}
+           </ul>`
+        : "";
+      return `
       <tr>
         <td style="padding: 16px 0; border-bottom: 1px solid #e5e5e5;">
           <div style="font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
@@ -67,6 +89,7 @@ serve(async (req) => {
           <a href="${d.url}" style="color: #1a1a1a; text-decoration: none; font-size: 18px; font-weight: 600; line-height: 1.3;">
             ${d.title}
           </a>
+          ${pointsHtml}
           ${d.quote ? `<div style="margin-top: 8px; padding-left: 12px; border-left: 3px solid #f59e0b; color: #666; font-style: italic; font-size: 14px;">"${d.quote}"</div>` : ""}
           <div style="margin-top: 8px;">
             <span style="background: #f0f0f0; padding: 2px 8px; border-radius: 12px; font-size: 12px; color: #666;">
@@ -74,8 +97,8 @@ serve(async (req) => {
             </span>
           </div>
         </td>
-      </tr>
-    `).join("");
+      </tr>`;
+    }).join("");
 
     const emailHtml = `
     <!DOCTYPE html>
