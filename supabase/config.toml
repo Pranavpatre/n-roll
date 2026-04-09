@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.fetch-gmail-content]
 verify_jwt = false
+
+[functions.send-weekly-digest]
+verify_jwt = false
+
+[functions.unsubscribe]
+verify_jwt = false

@@ -44,10 +44,10 @@ serve(async (req) => {
       pointsByDigest.set(p.digest_id, arr);
     }
 
-    // Get users who opted in to weekly digest
+    // Get users who opted in to weekly digest (include unsubscribe token)
     const { data: prefs, error: prefsError } = await supabase
       .from("email_preferences")
-      .select("user_id")
+      .select("user_id, unsubscribe_token")
       .eq("weekly_digest", true);
 
     if (prefsError) throw prefsError;
@@ -59,18 +59,23 @@ serve(async (req) => {
 
     // Get user emails from auth.users
     const userIds = prefs.map((p: any) => p.user_id);
+    const tokenByUserId = new Map(prefs.map((p: any) => [p.user_id, p.unsubscribe_token]));
     const { data: { users }, error: usersError } = await supabase.auth.admin.listUsers();
     if (usersError) throw usersError;
 
-    const subscriberEmails = (users || [])
+    const subscribers = (users || [])
       .filter((u: any) => userIds.includes(u.id) && u.email)
-      .map((u: any) => u.email);
+      .map((u: any) => ({ email: u.email, token: tokenByUserId.get(u.id) }));
+    const subscriberEmails = subscribers.map((s: any) => s.email);
 
     if (subscriberEmails.length === 0) {
       return new Response(JSON.stringify({ sent: 0, reason: "no_emails" }), {
         headers: { "Content-Type": "application/json" },
       });
     }
+
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "onboarding@resend.dev"; // TODO: replace with verified domain email
 
     // Build email HTML
     const articlesHtml = topDigests.map((d: any, i: number) => {
@@ -100,7 +105,7 @@ serve(async (req) => {
       </tr>`;
     }).join("");
 
-    const emailHtml = `
+    const buildEmailHtml = (unsubscribeToken: string) => `
     <!DOCTYPE html>
     <html>
     <body style="margin: 0; padding: 0; background: #fafaf8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
@@ -125,6 +130,8 @@ serve(async (req) => {
           <td style="padding: 24px; text-align: center; border-top: 1px solid #e5e5e5;">
             <p style="color: #999; font-size: 12px; margin: 0;">
               You're receiving this because you have weekly digests enabled on AI Buzz.
+              <br/>
+              <a href="${SUPABASE_URL}/functions/v1/unsubscribe?token=${unsubscribeToken}" style="color: #999; text-decoration: underline;">Unsubscribe</a>
             </p>
           </td>
         </tr>
@@ -134,7 +141,7 @@ serve(async (req) => {
 
     // Send to each subscriber
     let sentCount = 0;
-    for (const email of subscriberEmails) {
+    for (const subscriber of subscribers) {
       try {
         const res = await fetch("https://api.resend.com/emails", {
           method: "POST",
@@ -143,20 +150,20 @@ serve(async (req) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            from: "AI Buzz <onboarding@resend.dev>",
-            to: [email],
+            from: `AI Buzz <${FROM_EMAIL}>`,
+            to: [subscriber.email],
             subject: `Your Weekly AI Buzz - Top ${topDigests.length} Stories`,
-            html: emailHtml,
+            html: buildEmailHtml(subscriber.token),
           }),
         });
         if (res.ok) sentCount++;
-        else console.error(`Failed to send to ${email}:`, await res.text());
+        else console.error(`Failed to send to ${subscriber.email}:`, await res.text());
       } catch (e) {
-        console.error(`Error sending to ${email}:`, e);
+        console.error(`Error sending to ${subscriber.email}:`, e);
       }
     }
 
-    return new Response(JSON.stringify({ sent: sentCount, total: subscriberEmails.length }), {
+    return new Response(JSON.stringify({ sent: sentCount, total: subscribers.length }), {
       headers: { "Content-Type": "application/json" },
     });
   } catch (e) {

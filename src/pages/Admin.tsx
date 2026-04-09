@@ -365,12 +365,33 @@ const Admin = () => {
   };
 
   const suggestedSources = [
+    { category: "AI Lab Blogs", type: "article", items: [
+      { name: "OpenAI Blog", url: "https://openai.com/news/rss.xml" },
+      { name: "Google DeepMind Blog", url: "https://deepmind.google/blog/rss.xml" },
+      { name: "Anthropic Blog", url: "https://www.anthropic.com/rss.xml" },
+      { name: "Microsoft Research AI", url: "https://www.microsoft.com/en-us/research/blog/feed/" },
+      { name: "Google AI Blog", url: "https://blog.google/technology/ai/rss/" },
+      { name: "Mistral AI", url: "https://mistral.ai/news/rss" },
+      { name: "xAI / Grok", url: "https://x.ai/blog/rss" },
+      { name: "Cohere Blog", url: "https://cohere.com/blog/rss" },
+      { name: "Together AI Blog", url: "https://together.ai/blog/rss" },
+      { name: "Hugging Face Blog", url: "https://huggingface.co/blog/feed.xml" },
+      { name: "Berkeley BAIR Blog", url: "https://bair.berkeley.edu/blog/feed.xml" },
+      { name: "Stanford SAIL", url: "https://ai.stanford.edu/blog/feed.xml" },
+      { name: "Allen Institute for AI (AI2)", url: "https://allenai.org/blog/rss.xml" },
+    ]},
+    { category: "Research & Papers", type: "article", items: [
+      { name: "Papers with Code", url: "https://paperswithcode.com/rss.xml" },
+      { name: "OpenReview", url: "https://openreview.net/rss" },
+    ]},
     { category: "Substack Blogs", type: "article", items: [
       { name: "Simon Willison", url: "https://simonwillison.substack.com/feed" },
       { name: "One Useful Thing (Ethan Mollick)", url: "https://oneusefulthing.substack.com/feed" },
       { name: "Import AI (Jack Clark)", url: "https://importai.substack.com/feed" },
       { name: "Semi Analysis", url: "https://semianalysis.com/feed" },
       { name: "The Batch (Andrew Ng)", url: "https://read.deeplearning.ai/feed" },
+      { name: "The Gradient", url: "https://thegradient.pub/rss/" },
+      { name: "Ahead of AI (Sebastian Raschka)", url: "https://ahead-of-ai.com/feed/" },
     ]},
     { category: "ArXiv Papers", type: "article", items: [
       { name: "ArXiv cs.AI", url: "http://export.arxiv.org/rss/cs.AI" },
@@ -537,7 +558,7 @@ const Admin = () => {
           <h2 className="font-display text-lg text-foreground flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" /> Suggested AI Sources
           </h2>
-          <p className="text-xs text-muted-foreground">One-click add curated AI content sources — Substack blogs, ArXiv papers, Reddit, Hacker News, and news RSS feeds.</p>
+          <p className="text-xs text-muted-foreground">One-click add curated AI content sources — lab blogs, research papers, Substack, ArXiv, Reddit, Hacker News, and news RSS feeds.</p>
           <div className="space-y-4">
             {suggestedSources.map((group) => (
               <div key={group.category}>
